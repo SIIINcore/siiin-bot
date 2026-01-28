@@ -172,7 +172,7 @@ Enjoy your stay and check out the links below!
 
 ───────────── ✦ INFORMATION ✦ ─────────────
 <:cryengine:1033530974107091035> [Information](https://discord.com/channels/1033462383798140978/1033506664810287134/1379592546887667722)
-<:cryengine:1033530974107091035> [Rules](https://discord.com/channels/1033462383798140981/1177257234787471422/1239185655683088395)
+<:cryengine:1033530974107091035> [Rules](https://discord.com/channels/1033462383798140978/1177257234787471422/1239185655683088395)
 <:cryengine:1033530974107091035> [Announcements](https://discord.com/channels/1033462383798140981/1237650687249092670)
 <:cryengine:1033530974107091035> [Search](https://discord.com/channels/1033462383798140981/1376910830490095798/1376912016517763094)
 <:cryengine:1033530974107091035> [Games List](https://discord.com/channels/1033462383798140981/1376904260842819685/1409551551818760204)
@@ -186,7 +186,6 @@ Enjoy your stay and check out the links below!
 <#1189391329097166989> ► [Use this Template](https://discord.com/channels/1033462383798140981/1379581746466783385/1379584565466763307)
 `;
         await welcomeChannel.send({ content: welcomeText });
-
         await updateStatsEmbed(member.guild);
     } catch (err) {
         console.error('[Welcome] Error sending message:', err);
@@ -198,10 +197,19 @@ client.on('guildMemberRemove', async member => {
     await updateStatsEmbed(member.guild);
 });
 
-// ====== Quand le bot est prêt ======
+// ====== Quand le bot est prêt avec Keep-alive ======
 client.on('clientReady', async () => {
     console.log(`🤖 Bot connected: ${client.user.tag}`);
+
+    // Premier lancement
     updateAll();
+
+    // Keep-alive log toutes les minutes
+    setInterval(() => {
+        console.log('🟢 Bot alive:', new Date().toLocaleTimeString());
+    }, 60_000);
+
+    // Update complet toutes les 10 minutes
     setInterval(updateAll, 10 * 60 * 1000);
 });
 
