@@ -118,7 +118,7 @@ async function updateAll() {
     console.log('✅ Update completed.');
 }
 
-// ====== Stats Server ultra décoratif ======
+// ====== STATS ======
 async function updateStatsEmbed(guild) {
     try {
         const channel = await guild.channels.fetch(STATS_CHANNEL_ID);
@@ -142,10 +142,10 @@ async function updateStatsEmbed(guild) {
         const bar = '🟥'.repeat(filledBlocks > maxBlocks ? maxBlocks : filledBlocks) + '⬛'.repeat(emptyBlocks < 0 ? 0 : emptyBlocks);
 
         const embed = new EmbedBuilder()
-            .setTitle('📊 Server Stats')
+            .setTitle('📊 **S E R V E R   S T A T S**')
             .setColor('#FF0000') // rouge YouTube
             .setDescription(
-                `${bar}\n\n👥 **Total Members:** ${totalMembers}\n🧑 **Humans:** ${humanCount}\n🤖 **Bots:** ${botCount}`
+                `${bar}\n\n👥 **Total Members:** ${totalMembers}\n🧑 **Peoples:** ${humanCount}\n🤖 **Apps:** ${botCount}`
             )
             .setFooter({ text: 'SIIIN Stats' })
             .setTimestamp();
@@ -156,7 +156,7 @@ async function updateStatsEmbed(guild) {
     }
 }
 
-// ====== Bienvenue décoratif ======
+// ====== WELCOME CHANNEL ======
 client.on('guildMemberAdd', async member => {
     try {
         const welcomeChannel = await client.channels.fetch(CHANNEL_WELCOME);
@@ -165,25 +165,26 @@ client.on('guildMemberAdd', async member => {
 
 **<:CVW:1371269829847289876> SIIIN PATCHES & EXTRA**
 
+${member}, Welcome to our server! <:CVW:1371269829847289876>
+
 ▫▫▫▫ **C H E C K** ▫▫▫▫
 
-${member}, welcome to our server! 🎉
 Enjoy your stay and check out the links below!
 
 ───────────── ✦ INFORMATION ✦ ─────────────
-<:cryengine:1033530974107091035> [Information](https://discord.com/channels/1033462383798140978/1033506664810287134/1379592546887667722)
+<:cryengine:1033530974107091035> [Information](https://discord.com/channels/1033462383798140978/1033506664810287134/1440058017545584871)
 <:cryengine:1033530974107091035> [Rules](https://discord.com/channels/1033462383798140978/1177257234787471422/1239185655683088395)
-<:cryengine:1033530974107091035> [Announcements](https://discord.com/channels/1033462383798140981/1237650687249092670)
-<:cryengine:1033530974107091035> [Search](https://discord.com/channels/1033462383798140981/1376910830490095798/1376912016517763094)
-<:cryengine:1033530974107091035> [Games List](https://discord.com/channels/1033462383798140981/1376904260842819685/1409551551818760204)
-<:cryengine:1033530974107091035> [Crysis and Crysis Warhead](https://discord.com/channels/1033462383798140981/1371242516556415098/1371242762417995776)
-<:cryengine:1033530974107091035> [Crysis Remastered](https://discord.com/channels/1033462383798140981/1372560937000763484/1372565847591092385)
+<:cryengine:1033530974107091035> [Announcements](https://discord.com/channels/1033462383798140978/1237650687249092670)
+<:cryengine:1033530974107091035> [Search](https://discord.com/channels/1033462383798140978/1376910830490095798/1376912016517763094)
+<:cryengine:1033530974107091035> [Games List](https://discord.com/channels/1033462383798140978/1376904260842819685/1409551551818760204)
+<:cryengine:1033530974107091035> [Crysis and Crysis Warhead](https://discord.com/channels/1033462383798140978/1371242516556415098/1371242762417995776)
+<:cryengine:1033530974107091035> [Crysis Remastered](https://discord.com/channels/1033462383798140978/1372560937000763484/1372565847591092385)
 
 ───────────── ✦ PLATFORMS ✦ ─────────────
-**STEAM | GOG | EA | CD-ROM**
+**STEAM | GOG | EA | UBISOFT | CD-ROM**
 
 ───────────── ✦ SUPPORT ✦ ─────────────
-<#1189391329097166989> ► [Use this Template](https://discord.com/channels/1033462383798140981/1379581746466783385/1379584565466763307)
+<#1189391329097166989> ► [Use this Template](https://discord.com/channels/1033462383798140978/1379581746466783385/1379584565466763307)
 `;
         await welcomeChannel.send({ content: welcomeText });
         await updateStatsEmbed(member.guild);
