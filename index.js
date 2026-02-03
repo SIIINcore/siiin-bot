@@ -190,7 +190,7 @@ Enjoy your stay and check out the links below!
 **STEAM | GOG | EA | UBISOFT | CD-ROM**
 
 ───────────── ✦ SUPPORT ✦ ─────────────
-<#1189391329097166989> ► [Use this Template](https://discord.com/channels/1033462383798140978/1379581746466783385/1379584565466763307)
+<#1468090646442279206> ► [Use this Template](https://discord.com/channels/1033462383798140978/1379581746466783385/1379584565466763307)
 `;
         await welcomeChannel.send({ content: welcomeText });
         await updateStatsEmbed(member.guild);
@@ -210,11 +210,12 @@ client.on('ready', async () => {
     await sendTicketEmbed();
 
     try {
-        const BOT_VERSION = "3.0.0.A02012026";
+        const BOT_VERSION = "3.0.0.A02012026.2"; //SIIINVERSION
         const BOT_CHANGELOG = `
-• Ajout du système d’auto-reboot (24h)
-• Fermeture propre Railway (SIGTERM)
-• Optimisation des stats serveur
+• Autoreboot set (24h)
+• Railway Host connect fixed (SIGTERM)
+• Stats fixed
+• Tickets system added and fixed
 `;
         const logChannel = await client.channels.fetch(LOG_CHANNEL_ID);
         if (logChannel) {
@@ -240,7 +241,7 @@ client.login(process.env.BOT_TOKEN);
 // ====== TICKETS ======
 async function sendTicketEmbed() {
     const channel = await client.channels.fetch(SUPPORT_CHANNEL_ID);
-    if (!channel) return console.warn("Salon support introuvable !");
+    if (!channel) return console.warn("Unfound channel !");
 
     const messages = await channel.messages.fetch({ limit: 10 });
     for (const [, msg] of messages.filter(m => m.author.id === client.user.id)) {
@@ -256,12 +257,12 @@ async function sendTicketEmbed() {
         .addComponents(
             new ButtonBuilder()
                 .setCustomId('open_ticket')
-                .setLabel('Ouvrir un ticket')
+                .setLabel('Open a ticket')
                 .setStyle(ButtonStyle.Primary)
         );
 
     await channel.send({ embeds: [embed], components: [row] });
-    console.log("✅ Ticket embed envoyé !");
+    console.log("✅ Ticket got created !");
 }
 
 // ====== INTERACTIONS ======
@@ -289,7 +290,7 @@ client.on('interactionCreate', async interaction => {
         });
 
         const embed = new EmbedBuilder()
-            .setTitle(`🎫 Ticket de ${user.username}`)
+            .setTitle(`🎫 Ticket for ${user.username}`)
             .setDescription("Ticket successfully open !\nThe staff will come soon to check it out.\nPush **Close** Button to close the ticket.")
             .setColor(0x00FF99);
 
@@ -302,13 +303,13 @@ client.on('interactionCreate', async interaction => {
             );
 
         await ticketChannel.send({ content: `<@${user.id}>`, embeds: [embed], components: [closeRow] });
-        await interaction.reply({ content: `✅ Ton ticket a été créé: ${ticketChannel}`, ephemeral: true });
+        await interaction.reply({ content: `✅ Your ticket has been set: ${ticketChannel}`, ephemeral: true });
 
         if (logChannel) {
             const logEmbed = new EmbedBuilder()
-                .setTitle("📂 Ticket ouvert")
+                .setTitle("📂 Ticket openned")
                 .setColor(0x00FF99)
-                .setDescription(`**Utilisateur :** ${user.tag} (${user.id})\n**Salon :** ${ticketChannel.name}`)
+                .setDescription(`**User :** ${user.tag} (${user.id})\n**Channel :** ${ticketChannel.name}`)
                 .setTimestamp();
             await logChannel.send({ embeds: [logEmbed] });
         }
@@ -322,9 +323,9 @@ client.on('interactionCreate', async interaction => {
 
         if (logChannel) {
             const logEmbed = new EmbedBuilder()
-                .setTitle("🗑️ Ticket fermé")
+                .setTitle("🗑️ Close ticket")
                 .setColor(0xFF0000)
-                .setDescription(`**Utilisateur :** ${user.tag} (${user.id})\n**Salon :** ${channel.name}`)
+                .setDescription(`**User :** ${user.tag} (${user.id})\n**Channel :** ${channel.name}`)
                 .setTimestamp();
             await logChannel.send({ embeds: [logEmbed] });
         }
