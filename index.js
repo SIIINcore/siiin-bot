@@ -202,6 +202,35 @@ client.on('guildMemberRemove', async member => {
 client.on('clientReady', async () => {
     console.log(`🤖 Bot connected: ${client.user.tag}`);
 
+    // --- Envoie le message embed de ticket ---
+    await sendTicketEmbed();
+
+    // --- Log dans le salon Discord ---
+    try {
+        const LOG_CHANNEL_ID = "1354801906161025236";
+        const BOT_VERSION = "3.0.0.A02012026"; // à mettre à jour à chaque release
+        const BOT_CHANGELOG = `
+• Ajout du système d’auto-reboot (24h)
+• Fermeture propre Railway (SIGTERM)
+• Optimisation des stats serveur
+`;
+
+        const logChannel = await client.channels.fetch(LOG_CHANNEL_ID);
+        if (logChannel) {
+            const embed = new EmbedBuilder()
+                .setTitle("🚀 Bot déployé / redémarré")
+                .setColor("#00FF99")
+                .setDescription(`**Version :** ${BOT_VERSION}\n\n**Changelog :**\n${BOT_CHANGELOG}`)
+                .setTimestamp();
+
+            await logChannel.send({ embeds: [embed] });
+        } else {
+            console.warn("⚠️ Salon de logs introuvable !");
+        }
+    } catch (err) {
+        console.error("❌ Impossible d’envoyer le log dans Discord :", err);
+    }
+
     // Premier lancement
     updateAll();
 
@@ -216,3 +245,186 @@ client.on('clientReady', async () => {
 
 // ====== Connexion ======
 client.login(process.env.BOT_TOKEN);
+
+// ====== TICKETS / SUPPORT (avec filtrage fichiers) ======
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+
+const SUPPORT_CHANNEL_ID = "1468090646442279206"; // Salon avec le bouton
+const TICKET_CATEGORY_ID = "1237716160842305566"; // Catégorie où créer le ticket
+const STAFF_IDS = ["847798063821225985", "400331452245344268"]; // IDs du staff
+const BOT_ID = "1465878128219128005"; // ID du bot
+
+// Extensions autorisées
+const ALLOWED_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.mov'];
+
+// Fonction pour envoyer l'embed avec bouton "Ouvrir un ticket"
+async function sendTicketEmbed() {
+  const channel = await client.channels.fetch(SUPPORT_CHANNEL_ID);
+  if (!channel) return console.warn("Salon support introuvable !");
+
+  // Supprime les anciens messages du bot dans ce salon
+  const messages = await channel.messages.fetch({ limit: 10 });
+  const botMessages = messages.filter(msg => msg.author.id === client.user.id);
+  for (const [, msg] of botMessages) await msg.delete().catch(() => {});
+
+  const embed = new EmbedBuilder()
+    .setTitle("🎫 Support / Tickets")
+    .setDescription("**Push the button to create a ticket**.\nOur staff will answer as soon as possible.\n**Do not Tag us** or the ticket will be deleted !\n**Youtube links and images/videos allowed, other links/files blocked**")
+    .setColor(0x00FF99);
+
+  const row = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('open_ticket')
+        .setLabel('Ouvrir un ticket')
+        .setStyle(ButtonStyle.Primary)
+    );
+
+  await channel.send({ embeds: [embed], components: [row] });
+  console.log("✅ Ticket embed envoyé !");
+}
+
+// ===== Gestion des interactions sur boutons (avec logs) =====
+const LOG_CHANNEL_ID = "1354801906161025236"; // Salon de logs pour tickets
+
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isButton()) return;
+
+  const guild = interaction.guild;
+  const user = interaction.user;
+  const logChannel = await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+
+  // ===== Ouvrir un ticket =====
+  if (interaction.customId === 'open_ticket') {
+    const existing = guild.channels.cache.find(c => c.name === `ticket-${user.id}`);
+    if (existing) return interaction.reply({ content: "❌ You already have an open Ticket !", ephemeral: true });
+
+    const ticketChannel = await guild.channels.create({
+      name: `ticket-${user.id}`,
+      type: 0, // text channel
+      parent: TICKET_CATEGORY_ID,
+      permissionOverwrites: [
+        { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+        { id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.AttachFiles] },
+        ...STAFF_IDS.map(id => ({ id: id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages] })),
+        { id: BOT_ID, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages] },
+      ]
+    });
+
+    const embed = new EmbedBuilder()
+      .setTitle(`🎫 Ticket de ${user.username}`)
+      .setDescription("Ticket successfully open !\nThe staff will come soon to check it out.\nPush **Close** Button to close the ticket.")
+      .setColor(0x00FF99);
+
+    const closeRow = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('close_ticket')
+          .setLabel('Close')
+          .setStyle(ButtonStyle.Danger)
+      );
+
+    await ticketChannel.send({ content: `<@${user.id}>`, embeds: [embed], components: [closeRow] });
+    await interaction.reply({ content: `✅ Ton ticket a été créé: ${ticketChannel}`, ephemeral: true });
+
+    // --- Log ouverture ---
+    if (logChannel) {
+      const logEmbed = new EmbedBuilder()
+        .setTitle("📂 Ticket ouvert")
+        .setColor(0x00FF99)
+        .setDescription(`**Utilisateur :** ${user.tag} (${user.id})\n**Salon :** ${ticketChannel.name}`)
+        .setTimestamp();
+      await logChannel.send({ embeds: [logEmbed] });
+    }
+  }
+
+  // ===== Fermer un ticket =====
+  if (interaction.customId === 'close_ticket') {
+    await interaction.deferReply({ ephemeral: true });
+    const channel = interaction.channel;
+
+    await interaction.editReply({ content: "🕐 Ticket will be deleted in 5 minutes." });
+
+    // --- Log fermeture ---
+    if (logChannel) {
+      const logEmbed = new EmbedBuilder()
+        .setTitle("🗑️ Ticket fermé")
+        .setColor(0xFF0000)
+        .setDescription(`**Utilisateur :** ${user.tag} (${user.id})\n**Salon :** ${channel.name}`)
+        .setTimestamp();
+      await logChannel.send({ embeds: [logEmbed] });
+    }
+
+    setTimeout(async () => {
+      await channel.delete().catch(() => {});
+    }, 5 * 60 * 1000);
+  }
+});
+
+// ===== Filtrage des messages et fichiers dans les tickets =====
+client.on('messageCreate', async message => {
+  if (!message.channel.name.startsWith('ticket-') || message.author.bot) return;
+
+  const content = message.content;
+  const attachments = message.attachments;
+
+  // Regex pour links
+  const youtubeRegex = /(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i;
+  const linkRegex = /(https?:\/\/[^\s]+)/i;
+
+  // Bloque liens non-Youtube
+  if (linkRegex.test(content) && !youtubeRegex.test(content)) {
+    await message.delete().catch(() => {});
+    const warnMsg = await message.channel.send(`<@${message.author.id}> ❌ Only YouTube links are allowed.`);
+    setTimeout(() => warnMsg.delete().catch(() => {}), 7000);
+    return;
+  }
+
+  // Vérifie les fichiers attachés
+  attachments.forEach(att => {
+    const ext = att.name?.substring(att.name.lastIndexOf('.')).toLowerCase();
+    if (!ALLOWED_FILE_EXTENSIONS.includes(ext)) {
+      message.delete().catch(() => {});
+      message.channel.send({ content: `<@${message.author.id}> ❌ File type not allowed.`, allowedMentions: { users: [message.author.id] } })
+        .then(msg => setTimeout(() => msg.delete().catch(() => {}), 7000));
+    }
+  });
+});
+
+// ================================
+// 🔄 AUTO-REBOOT RAILWAY (24H)
+// ================================
+
+const hours = Number(process.env.AUTO_REBOOT_HOURS || 24);
+const REBOOT_DELAY = hours * 60 * 60 * 1000;
+
+let shuttingDown = false;
+
+console.log(`⏱️ Auto reboot activé toutes les ${hours}h`);
+
+async function shutdown(reason) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  console.log(`🛑 Shutdown en cours (${reason})...`);
+
+  try {
+    if (client) {
+      await client.destroy(); // fermeture propre Discord
+    }
+  } catch (err) {
+    console.error("❌ Erreur lors de la fermeture du client :", err);
+  } finally {
+    process.exit(0);
+  }
+}
+
+// Reboot déclenché par Railway
+process.on("SIGTERM", () => shutdown("SIGTERM Railway"));
+
+// Reboot automatique après X heures
+setTimeout(() => {
+  shutdown("Auto reboot programmé");
+}, REBOOT_DELAY);
+
+
