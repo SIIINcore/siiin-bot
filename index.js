@@ -1,19 +1,34 @@
 // index.js
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { 
+    Client, 
+    GatewayIntentBits, 
+    EmbedBuilder, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    PermissionFlagsBits 
+} = require('discord.js');
+
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 require('dotenv').config();
 
-// Channels
+// ====== CHANNELS ======
 const CHANNEL_FREEGAMES = '1237671753833254946';
 const CHANNEL_PROMOS = '1370860980594151534';
 const CHANNEL_WELCOME = '1033462383798140981';
 const STATS_CHANNEL_ID = '1465938751208558643';
+const SUPPORT_CHANNEL_ID = "1468090646442279206";
+const TICKET_CATEGORY_ID = "1237716160842305566";
+const LOG_CHANNEL_ID = "1354801906161025236";
+const STAFF_IDS = ["847798063821225985", "400331452245344268"];
+const BOT_ID = "1465878128219128005";
+const ALLOWED_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.mov'];
 
 // Stockage pour éviter les doublons
 let postedGames = new Set();
 let postedPromos = new Set();
 
-// Crée le client Discord
+// ====== CLIENT ======
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -23,11 +38,10 @@ const client = new Client({
     ]
 });
 
-// ====== Fonctions API ======
+// ====== FUNCTIONS API ======
 async function fetchFreeGames() {
     try {
-        const url = 'https://www.gamerpower.com/api/giveaways?platform=epic-games-store';
-        const res = await fetch(url);
+        const res = await fetch('https://www.gamerpower.com/api/giveaways?platform=epic-games-store');
         const data = await res.json();
         return data.map(game => ({
             id: game.id,
@@ -45,14 +59,12 @@ async function fetchFreeGames() {
 
 async function fetchPromos() {
     try {
-        const url = 'https://www.cheapshark.com/api/1.0/deals?storeID=1&upperPrice=15';
-        const res = await fetch(url);
+        const res = await fetch('https://www.cheapshark.com/api/1.0/deals?storeID=1&upperPrice=15');
         const data = await res.json();
         return data.filter(game => {
             const normalPrice = parseFloat(game.normalPrice);
             const salePrice = parseFloat(game.salePrice);
-            const discountPercent = ((normalPrice - salePrice) / normalPrice) * 100;
-            return discountPercent >= 40;
+            return ((normalPrice - salePrice) / normalPrice) * 100 >= 40;
         }).map(game => ({
             id: game.dealID,
             title: game.title,
@@ -67,7 +79,7 @@ async function fetchPromos() {
     }
 }
 
-// ====== Post Games ======
+// ====== POSTING ======
 async function postFreeGames(channel) {
     const games = await fetchFreeGames();
     for (const game of games) {
@@ -106,7 +118,39 @@ async function postPromos(channel) {
     }
 }
 
-// ====== Update Complet ======
+// ====== STATS ======
+async function updateStatsEmbed(guild) {
+    try {
+        const channel = await guild.channels.fetch(STATS_CHANNEL_ID);
+        if (!channel) return;
+
+        const messages = await channel.messages.fetch({ limit: 10 });
+        for (const [, msg] of messages) await msg.delete().catch(() => {});
+
+        await guild.members.fetch();
+        const totalMembers = guild.memberCount;
+        const botCount = guild.members.cache.filter(m => m.user.bot).size;
+        const humanCount = totalMembers - botCount;
+
+        const maxBlocks = 20;
+        const filledBlocks = Math.round((totalMembers / 100) * maxBlocks);
+        const emptyBlocks = maxBlocks - filledBlocks;
+        const bar = '🟥'.repeat(filledBlocks > maxBlocks ? maxBlocks : filledBlocks) + '⬛'.repeat(emptyBlocks < 0 ? 0 : emptyBlocks);
+
+        const embed = new EmbedBuilder()
+            .setTitle('📊 **S E R V E R   S T A T S**')
+            .setColor('#FF0000')
+            .setDescription(`${bar}\n\n👥 **Total Members:** ${totalMembers}\n🧑 **Peoples:** ${humanCount}\n🤖 **Apps:** ${botCount}`)
+            .setFooter({ text: 'SIIIN Stats' })
+            .setTimestamp();
+
+        await channel.send({ embeds: [embed] });
+    } catch (err) {
+        console.error('[Stats] Error updating stats:', err);
+    }
+}
+
+// ====== UPDATE ALL ======
 async function updateAll() {
     console.log('📡 Updating free games and promos...');
     const freeChannel = await client.channels.fetch(CHANNEL_FREEGAMES);
@@ -118,45 +162,7 @@ async function updateAll() {
     console.log('✅ Update completed.');
 }
 
-// ====== STATS ======
-async function updateStatsEmbed(guild) {
-    try {
-        const channel = await guild.channels.fetch(STATS_CHANNEL_ID);
-        if (!channel) return;
-
-        // Supprime tous les messages existants
-        const messages = await channel.messages.fetch({ limit: 10 });
-        for (const [, msg] of messages) {
-            await msg.delete().catch(() => {});
-        }
-
-        await guild.members.fetch();
-        const totalMembers = guild.memberCount;
-        const botCount = guild.members.cache.filter(m => m.user.bot).size;
-        const humanCount = totalMembers - botCount;
-
-        // Progress bar décorative
-        const maxBlocks = 20;
-        const filledBlocks = Math.round((totalMembers / 100) * maxBlocks);
-        const emptyBlocks = maxBlocks - filledBlocks;
-        const bar = '🟥'.repeat(filledBlocks > maxBlocks ? maxBlocks : filledBlocks) + '⬛'.repeat(emptyBlocks < 0 ? 0 : emptyBlocks);
-
-        const embed = new EmbedBuilder()
-            .setTitle('📊 **S E R V E R   S T A T S**')
-            .setColor('#FF0000') // rouge YouTube
-            .setDescription(
-                `${bar}\n\n👥 **Total Members:** ${totalMembers}\n🧑 **Peoples:** ${humanCount}\n🤖 **Apps:** ${botCount}`
-            )
-            .setFooter({ text: 'SIIIN Stats' })
-            .setTimestamp();
-
-        await channel.send({ embeds: [embed] });
-    } catch (err) {
-        console.error('[Stats] Error updating stats:', err);
-    }
-}
-
-// ====== WELCOME CHANNEL ======
+// ====== WELCOME ======
 client.on('guildMemberAdd', async member => {
     try {
         const welcomeChannel = await client.channels.fetch(CHANNEL_WELCOME);
@@ -193,28 +199,23 @@ Enjoy your stay and check out the links below!
     }
 });
 
-// ====== Update stats quand un membre quitte ======
 client.on('guildMemberRemove', async member => {
     await updateStatsEmbed(member.guild);
 });
 
-// ====== Quand le bot est prêt avec Keep-alive ======
-client.on('clientReady', async () => {
+// ====== CLIENT READY ======
+client.on('ready', async () => {
     console.log(`🤖 Bot connected: ${client.user.tag}`);
 
-    // --- Envoie le message embed de ticket ---
     await sendTicketEmbed();
 
-    // --- Log dans le salon Discord ---
     try {
-        const LOG_CHANNEL_ID = "1354801906161025236";
-        const BOT_VERSION = "3.0.0.A02012026"; // à mettre à jour à chaque release
+        const BOT_VERSION = "3.0.0.A02012026";
         const BOT_CHANGELOG = `
 • Ajout du système d’auto-reboot (24h)
 • Fermeture propre Railway (SIGTERM)
 • Optimisation des stats serveur
 `;
-
         const logChannel = await client.channels.fetch(LOG_CHANNEL_ID);
         if (logChannel) {
             const embed = new EmbedBuilder()
@@ -222,209 +223,154 @@ client.on('clientReady', async () => {
                 .setColor("#00FF99")
                 .setDescription(`**Version :** ${BOT_VERSION}\n\n**Changelog :**\n${BOT_CHANGELOG}`)
                 .setTimestamp();
-
             await logChannel.send({ embeds: [embed] });
-        } else {
-            console.warn("⚠️ Salon de logs introuvable !");
         }
     } catch (err) {
         console.error("❌ Impossible d’envoyer le log dans Discord :", err);
     }
 
-    // Premier lancement
     updateAll();
-
-    // Keep-alive log toutes les minutes
-    setInterval(() => {
-        console.log('🟢 Bot alive:', new Date().toLocaleTimeString());
-    }, 60_000);
-
-    // Update complet toutes les 10 minutes
+    setInterval(() => console.log('🟢 Bot alive:', new Date().toLocaleTimeString()), 60_000);
     setInterval(updateAll, 10 * 60 * 1000);
 });
 
-// ====== Connexion ======
+// ====== LOGIN ======
 client.login(process.env.BOT_TOKEN);
 
-// ====== TICKETS / SUPPORT (avec filtrage fichiers) ======
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-
-const SUPPORT_CHANNEL_ID = "1468090646442279206"; // Salon avec le bouton
-const TICKET_CATEGORY_ID = "1237716160842305566"; // Catégorie où créer le ticket
-const STAFF_IDS = ["847798063821225985", "400331452245344268"]; // IDs du staff
-const BOT_ID = "1465878128219128005"; // ID du bot
-
-// Extensions autorisées
-const ALLOWED_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.mov'];
-
-// Fonction pour envoyer l'embed avec bouton "Ouvrir un ticket"
+// ====== TICKETS ======
 async function sendTicketEmbed() {
-  const channel = await client.channels.fetch(SUPPORT_CHANNEL_ID);
-  if (!channel) return console.warn("Salon support introuvable !");
+    const channel = await client.channels.fetch(SUPPORT_CHANNEL_ID);
+    if (!channel) return console.warn("Salon support introuvable !");
 
-  // Supprime les anciens messages du bot dans ce salon
-  const messages = await channel.messages.fetch({ limit: 10 });
-  const botMessages = messages.filter(msg => msg.author.id === client.user.id);
-  for (const [, msg] of botMessages) await msg.delete().catch(() => {});
-
-  const embed = new EmbedBuilder()
-    .setTitle("🎫 Support / Tickets")
-    .setDescription("**Push the button to create a ticket**.\nOur staff will answer as soon as possible.\n**Do not Tag us** or the ticket will be deleted !\n**Youtube links and images/videos allowed, other links/files blocked**")
-    .setColor(0x00FF99);
-
-  const row = new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('open_ticket')
-        .setLabel('Ouvrir un ticket')
-        .setStyle(ButtonStyle.Primary)
-    );
-
-  await channel.send({ embeds: [embed], components: [row] });
-  console.log("✅ Ticket embed envoyé !");
-}
-
-// ===== Gestion des interactions sur boutons (avec logs) =====
-const LOG_CHANNEL_ID = "1354801906161025236"; // Salon de logs pour tickets
-
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isButton()) return;
-
-  const guild = interaction.guild;
-  const user = interaction.user;
-  const logChannel = await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
-
-  // ===== Ouvrir un ticket =====
-  if (interaction.customId === 'open_ticket') {
-    const existing = guild.channels.cache.find(c => c.name === `ticket-${user.id}`);
-    if (existing) return interaction.reply({ content: "❌ You already have an open Ticket !", ephemeral: true });
-
-    const ticketChannel = await guild.channels.create({
-      name: `ticket-${user.id}`,
-      type: 0, // text channel
-      parent: TICKET_CATEGORY_ID,
-      permissionOverwrites: [
-        { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-        { id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.AttachFiles] },
-        ...STAFF_IDS.map(id => ({ id: id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages] })),
-        { id: BOT_ID, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages] },
-      ]
-    });
+    const messages = await channel.messages.fetch({ limit: 10 });
+    for (const [, msg] of messages.filter(m => m.author.id === client.user.id)) {
+        await msg.delete().catch(() => {});
+    }
 
     const embed = new EmbedBuilder()
-      .setTitle(`🎫 Ticket de ${user.username}`)
-      .setDescription("Ticket successfully open !\nThe staff will come soon to check it out.\nPush **Close** Button to close the ticket.")
-      .setColor(0x00FF99);
+        .setTitle("🎫 Support / Tickets")
+        .setDescription("**Push the button to create a ticket**.\nOur staff will answer as soon as possible.\n**Do not Tag us** or the ticket will be deleted !\n**Youtube links and images/videos allowed, other links/files blocked**")
+        .setColor(0x00FF99);
 
-    const closeRow = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId('close_ticket')
-          .setLabel('Close')
-          .setStyle(ButtonStyle.Danger)
-      );
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('open_ticket')
+                .setLabel('Ouvrir un ticket')
+                .setStyle(ButtonStyle.Primary)
+        );
 
-    await ticketChannel.send({ content: `<@${user.id}>`, embeds: [embed], components: [closeRow] });
-    await interaction.reply({ content: `✅ Ton ticket a été créé: ${ticketChannel}`, ephemeral: true });
+    await channel.send({ embeds: [embed], components: [row] });
+    console.log("✅ Ticket embed envoyé !");
+}
 
-    // --- Log ouverture ---
-    if (logChannel) {
-      const logEmbed = new EmbedBuilder()
-        .setTitle("📂 Ticket ouvert")
-        .setColor(0x00FF99)
-        .setDescription(`**Utilisateur :** ${user.tag} (${user.id})\n**Salon :** ${ticketChannel.name}`)
-        .setTimestamp();
-      await logChannel.send({ embeds: [logEmbed] });
+// ====== INTERACTIONS ======
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isButton()) return;
+
+    const guild = interaction.guild;
+    const user = interaction.user;
+    const logChannel = await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+
+    if (interaction.customId === 'open_ticket') {
+        const existing = guild.channels.cache.find(c => c.name === `ticket-${user.id}`);
+        if (existing) return interaction.reply({ content: "❌ You already have an open Ticket !", ephemeral: true });
+
+        const ticketChannel = await guild.channels.create({
+            name: `ticket-${user.id}`,
+            type: 0,
+            parent: TICKET_CATEGORY_ID,
+            permissionOverwrites: [
+                { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+                { id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.AttachFiles] },
+                ...STAFF_IDS.map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages] })),
+                { id: BOT_ID, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages] },
+            ]
+        });
+
+        const embed = new EmbedBuilder()
+            .setTitle(`🎫 Ticket de ${user.username}`)
+            .setDescription("Ticket successfully open !\nThe staff will come soon to check it out.\nPush **Close** Button to close the ticket.")
+            .setColor(0x00FF99);
+
+        const closeRow = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('close_ticket')
+                    .setLabel('Close')
+                    .setStyle(ButtonStyle.Danger)
+            );
+
+        await ticketChannel.send({ content: `<@${user.id}>`, embeds: [embed], components: [closeRow] });
+        await interaction.reply({ content: `✅ Ton ticket a été créé: ${ticketChannel}`, ephemeral: true });
+
+        if (logChannel) {
+            const logEmbed = new EmbedBuilder()
+                .setTitle("📂 Ticket ouvert")
+                .setColor(0x00FF99)
+                .setDescription(`**Utilisateur :** ${user.tag} (${user.id})\n**Salon :** ${ticketChannel.name}`)
+                .setTimestamp();
+            await logChannel.send({ embeds: [logEmbed] });
+        }
     }
-  }
 
-  // ===== Fermer un ticket =====
-  if (interaction.customId === 'close_ticket') {
-    await interaction.deferReply({ ephemeral: true });
-    const channel = interaction.channel;
+    if (interaction.customId === 'close_ticket') {
+        await interaction.deferReply({ ephemeral: true });
+        const channel = interaction.channel;
 
-    await interaction.editReply({ content: "🕐 Ticket will be deleted in 5 minutes." });
+        await interaction.editReply({ content: "🕐 Ticket will be deleted in 5 minutes." });
 
-    // --- Log fermeture ---
-    if (logChannel) {
-      const logEmbed = new EmbedBuilder()
-        .setTitle("🗑️ Ticket fermé")
-        .setColor(0xFF0000)
-        .setDescription(`**Utilisateur :** ${user.tag} (${user.id})\n**Salon :** ${channel.name}`)
-        .setTimestamp();
-      await logChannel.send({ embeds: [logEmbed] });
+        if (logChannel) {
+            const logEmbed = new EmbedBuilder()
+                .setTitle("🗑️ Ticket fermé")
+                .setColor(0xFF0000)
+                .setDescription(`**Utilisateur :** ${user.tag} (${user.id})\n**Salon :** ${channel.name}`)
+                .setTimestamp();
+            await logChannel.send({ embeds: [logEmbed] });
+        }
+
+        setTimeout(async () => await channel.delete().catch(() => {}), 5 * 60 * 1000);
     }
-
-    setTimeout(async () => {
-      await channel.delete().catch(() => {});
-    }, 5 * 60 * 1000);
-  }
 });
 
-// ===== Filtrage des messages et fichiers dans les tickets =====
+// ====== MESSAGE FILTER ======
 client.on('messageCreate', async message => {
-  if (!message.channel.name.startsWith('ticket-') || message.author.bot) return;
+    if (!message.channel.name.startsWith('ticket-') || message.author.bot) return;
 
-  const content = message.content;
-  const attachments = message.attachments;
+    const youtubeRegex = /(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i;
+    const linkRegex = /(https?:\/\/[^\s]+)/i;
 
-  // Regex pour links
-  const youtubeRegex = /(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i;
-  const linkRegex = /(https?:\/\/[^\s]+)/i;
-
-  // Bloque liens non-Youtube
-  if (linkRegex.test(content) && !youtubeRegex.test(content)) {
-    await message.delete().catch(() => {});
-    const warnMsg = await message.channel.send(`<@${message.author.id}> ❌ Only YouTube links are allowed.`);
-    setTimeout(() => warnMsg.delete().catch(() => {}), 7000);
-    return;
-  }
-
-  // Vérifie les fichiers attachés
-  attachments.forEach(att => {
-    const ext = att.name?.substring(att.name.lastIndexOf('.')).toLowerCase();
-    if (!ALLOWED_FILE_EXTENSIONS.includes(ext)) {
-      message.delete().catch(() => {});
-      message.channel.send({ content: `<@${message.author.id}> ❌ File type not allowed.`, allowedMentions: { users: [message.author.id] } })
-        .then(msg => setTimeout(() => msg.delete().catch(() => {}), 7000));
+    if (linkRegex.test(message.content) && !youtubeRegex.test(message.content)) {
+        await message.delete().catch(() => {});
+        const warnMsg = await message.channel.send(`<@${message.author.id}> ❌ Only YouTube links are allowed.`);
+        setTimeout(() => warnMsg.delete().catch(() => {}), 7000);
+        return;
     }
-  });
+
+    message.attachments.forEach(att => {
+        const ext = att.name?.substring(att.name.lastIndexOf('.')).toLowerCase();
+        if (!ALLOWED_FILE_EXTENSIONS.includes(ext)) {
+            message.delete().catch(() => {});
+            message.channel.send({ content: `<@${message.author.id}> ❌ File type not allowed.`, allowedMentions: { users: [message.author.id] } })
+                .then(msg => setTimeout(() => msg.delete().catch(() => {}), 7000));
+        }
+    });
 });
 
-// ================================
-// 🔄 AUTO-REBOOT RAILWAY (24H)
-// ================================
-
+// ====== AUTO-REBOOT ======
 const hours = Number(process.env.AUTO_REBOOT_HOURS || 24);
 const REBOOT_DELAY = hours * 60 * 60 * 1000;
-
 let shuttingDown = false;
-
 console.log(`⏱️ Auto reboot activé toutes les ${hours}h`);
 
 async function shutdown(reason) {
-  if (shuttingDown) return;
-  shuttingDown = true;
+    if (shuttingDown) return;
+    shuttingDown = true;
 
-  console.log(`🛑 Shutdown en cours (${reason})...`);
-
-  try {
-    if (client) {
-      await client.destroy(); // fermeture propre Discord
-    }
-  } catch (err) {
-    console.error("❌ Erreur lors de la fermeture du client :", err);
-  } finally {
-    process.exit(0);
-  }
+    console.log(`🛑 Shutdown en cours (${reason})...`);
+    try { if (client) await client.destroy(); } catch (err) { console.error(err); }
+    finally { process.exit(0); }
 }
 
-// Reboot déclenché par Railway
 process.on("SIGTERM", () => shutdown("SIGTERM Railway"));
-
-// Reboot automatique après X heures
-setTimeout(() => {
-  shutdown("Auto reboot programmé");
-}, REBOOT_DELAY);
-
-
+setTimeout(() => shutdown("Auto reboot programmé"), REBOOT_DELAY);
