@@ -201,11 +201,37 @@ async function updateStatsEmbed(guild) {
 }
 
 // ================================
-// WELCOME | MESSAGE
+// WELCOME | MESSAGE | ADD ROLE
 // ================================
 client.on('guildMemberAdd', async member => {
     try {
+        // ================================
+        // SAFEMODE | ADD ROLE
+        // ================================
+        const roleId = '1033463588934918164'; // ID du rôle à ajouter
+        try {
+            // DISCORD API
+            const role = await member.guild.roles.fetch(roleId);
+            if (role) {
+                // CHECK USER ROLE TO NOT REMOVE THE GOOD ONE
+                if (!member.roles.cache.has(roleId)) {
+                    await member.roles.add(role);
+                    console.log(`✅ Role "${role.name}" given to ${member.user.tag}`);
+                } else {
+                    console.log(`ℹ️ ${member.user.tag} had already "${role.name}" role`);
+                }
+            } else {
+                console.warn(`❌ Unfound Fetch Role : ${roleId}`);
+            }
+        } catch (err) {
+            console.error(`❌ Unable to add the role to ${member.user.tag} :`, err);
+        }
+
+        // ================================
+        // WELCOME | MESSAGE
+        // ================================
         const welcomeChannel = await client.channels.fetch(CHANNEL_WELCOME);
+
         const welcomeText = `
 # ─── ✦ W E L C O M E ✦ ───
 **<:CVW:1371269829847289876> SIIIN PATCHES & EXTRA**
@@ -215,43 +241,43 @@ Enjoy your stay and check out the links below!
 ▫▫▫▫ **C H E C K** ▫▫▫▫
 
 # ─── ✦ INFORMATION ✦ ───
-<:cryengine:1033530974107091035> [Information](https://discord.com/channels/1033462383798140978/1033506664810287134/1440058017545584871)
-<:cryengine:1033530974107091035> [Rules](https://discord.com/channels/1033462383798140978/1177257234787471422/1239185655683088395)
-<:cryengine:1033530974107091035> [Announcements](https://discord.com/channels/1033462383798140978/1237650687249092670)
-<:cryengine:1033530974107091035> [Search](https://discord.com/channels/1033462383798140978/1376910830490095798/1376912016517763094)
-<:cryengine:1033530974107091035> [Games List](https://discord.com/channels/1033462383798140978/1376904260842819685/1409551551818760204)
-<:cryengine:1033530974107091035> [Crysis and Crysis Warhead](https://discord.com/channels/1033462383798140978/1371242516556415098/1371242762417995776)
-<:cryengine:1033530974107091035> [Crysis Remastered](https://discord.com/channels/1033462383798140978/1372560937000763484/1372565847591092385)
+<:cryengine:1033530974107091035> [Information](https://discord.com/channels/1033462383798140981/1033506664810287134/1440058017545584871)
+<:cryengine:1033530974107091035> [Rules](https://discord.com/channels/1033462383798140978/1177257234787471422/1468570201095274552)
+<:cryengine:1033530974107091035> [Announcements](https://discord.com/channels/1033462383798140981/1237650687249092670)
+<:cryengine:1033530974107091035> [Search](https://discord.com/channels/1033462383798140981/1376910830490095798/1376912016517763094)
+<:cryengine:1033530974107091035> [Games List](https://discord.com/channels/1033462383798140981/1376904260842819685/1409551551818760204)
+<:cryengine:1033530974107091035> [Crysis and Crysis Warhead](https://discord.com/channels/1033462383798140981/1371242516556415098/1371242762417995776)
+<:cryengine:1033530974107091035> [Crysis Remastered](https://discord.com/channels/1033462383798140981/1372560937000763484/1372565847591092385)
 
 # ─── ✦ PLATFORMS ✦ ───
 **STEAM | GOG | EA | UBISOFT | CD-ROM**
 
 # ─── ✦ SUPPORT ✦ ───
-<#1468090646442279206> ► [Use this Template](https://discord.com/channels/1033462383798140978/1379581746466783385/1379584565466763307)
-Then post it there ► <#1468090646442279206>
+**Check 1st the [Support rules](https://discord.com/channels/1033462383798140978/1379581746466783385/1379582509062426754) ► Then use ► The <#1468090646442279206> system.
 
 # ─── ✦ DONATIONS ✦ ───
-To support us, please feel free to donate a bit. [Just Here](https://discord.com/channels/1033462383798140978/1178517213444046948/1351344918546874461)
+To support us, please feel free to donate a bit. [Just Here](https://discord.com/channels/1033462383798140981/1178517213444046948/1351344918546874461)
 [Paypal Direct link](https://www.paypal.com/paypalme/LunaSiiin?)
 `;
-    await welcomeChannel.send({ content: welcomeText });
+
+        await welcomeChannel.send({ content: welcomeText });
+
+        // STATS UPDATE
         await updateStatsEmbed(member.guild);
+
     } catch (err) {
-        console.error('[Welcome] Error sending message:', err);
+        console.error('[Welcome] Error sending message or adding role:', err);
     }
 });
 
-client.on('guildMemberRemove', async member => {
-    await updateStatsEmbed(member.guild);
-});
-
 // ================================
-// TICKETS | SUPPORT
+// TICKETS | SUPPORT COMPLET
 // ================================
 async function sendTicketEmbed() {
     const channel = await client.channels.fetch(SUPPORT_CHANNEL_ID);
     if (!channel) return console.warn("Unfound channel !");
 
+    // DELETE PREVIOUS BOT MESSAGES
     const messages = await channel.messages.fetch({ limit: 10 });
     for (const [, msg] of messages.filter(m => m.author.id === client.user.id)) {
         await msg.delete().catch(() => {});
@@ -259,7 +285,12 @@ async function sendTicketEmbed() {
 
     const embed = new EmbedBuilder()
         .setTitle("🎫 Support / Tickets")
-        .setDescription("**Push the button to create a ticket**.\nOur staff will answer as soon as possible.\n**Do not Tag us** or the ticket will be deleted !\n**Youtube links and images/videos allowed, other links/files blocked**")
+        .setDescription(
+`**Push the button to create a ticket**
+Our staff will answer as soon as possible.
+**Do not Tag us** or the ticket will be deleted!
+**Youtube links and images/videos allowed, other links/files blocked**`
+        )
         .setColor(0x00FF99);
 
     const row = new ActionRowBuilder()
@@ -271,7 +302,7 @@ async function sendTicketEmbed() {
         );
 
     await channel.send({ embeds: [embed], components: [row] });
-    console.log("✅ Ticket got created !");
+    console.log("✅ Ticket creation message sent!");
 }
 
 // ================================
@@ -284,6 +315,9 @@ client.on('interactionCreate', async interaction => {
     const user = interaction.user;
     const logChannel = await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
 
+    // ----------------------------
+    // OPEN TICKET
+    // ----------------------------
     if (interaction.customId === 'open_ticket') {
         const existing = guild.channels.cache.find(c => c.name === `ticket-${user.id}`);
         if (existing) return interaction.reply({ content: "❌ You already have an open Ticket !", ephemeral: true });
@@ -294,31 +328,60 @@ client.on('interactionCreate', async interaction => {
             parent: TICKET_CATEGORY_ID,
             permissionOverwrites: [
                 { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-                { id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.AttachFiles] },
-                ...STAFF_IDS.map(id => ({ id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages] })),
+                {
+                    id: user.id,
+                    allow: [
+                        PermissionFlagsBits.ViewChannel,
+                        PermissionFlagsBits.SendMessages,
+                        PermissionFlagsBits.AttachFiles
+                    ]
+                },
+                ...STAFF_IDS.map(id => ({
+                    id,
+                    allow: [
+                        PermissionFlagsBits.ViewChannel,
+                        PermissionFlagsBits.SendMessages,
+                        PermissionFlagsBits.ManageMessages
+                    ]
+                })),
                 { id: BOT_ID, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageMessages] },
             ]
         });
 
+        // EMBED TICKET CHOICE
         const embed = new EmbedBuilder()
-            .setTitle(`🎫 Ticket for ${user.username}`)
-            .setDescription("Ticket successfully open !\nThe staff will come soon to check it out.\nPush **Close** Button to close the ticket.")
+            .setTitle(`🎫 Ticket open for:`)
+            .setDescription(
+`Choose a category:
+**SUPPORT** > Need Help about a game
+**REQUEST** > Seek to add another game
+**OTHER** > None of the previous choices`
+            )
             .setColor(0x00FF99);
 
-        const closeRow = new ActionRowBuilder()
+        const row = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
-                    .setCustomId('close_ticket')
-                    .setLabel('Close')
-                    .setStyle(ButtonStyle.Danger)
+                    .setCustomId('ticket_support')
+                    .setLabel('SUPPORT')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('ticket_request')
+                    .setLabel('REQUEST')
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId('ticket_other')
+                    .setLabel('OTHER')
+                    .setStyle(ButtonStyle.Secondary)
             );
 
-        await ticketChannel.send({ content: `<@${user.id}>`, embeds: [embed], components: [closeRow] });
-        await interaction.reply({ content: `✅ Your ticket has been set: ${ticketChannel}`, ephemeral: true });
+        await ticketChannel.send({ content: `<@${user.id}>`, embeds: [embed], components: [row] });
+        await interaction.reply({ content: `✅ Your ticket has been created: ${ticketChannel}`, ephemeral: true });
 
+        // Log
         if (logChannel) {
             const logEmbed = new EmbedBuilder()
-                .setTitle("📂 Ticket openned")
+                .setTitle("📂 Ticket opened")
                 .setColor(0x00FF99)
                 .setDescription(`**User :** ${user.tag} (${user.id})\n**Channel :** ${ticketChannel.name}`)
                 .setTimestamp();
@@ -326,6 +389,57 @@ client.on('interactionCreate', async interaction => {
         }
     }
 
+    // ----------------------------
+    // TICKET | CATEGORY BUTTONS
+    // ----------------------------
+    if (['ticket_support','ticket_request','ticket_other'].includes(interaction.customId)) {
+    await interaction.deferReply({ ephemeral: true });
+
+    let templateEmbed = new EmbedBuilder();
+    if (interaction.customId === 'ticket_support') {
+        templateEmbed
+            .setTitle("🎮 Support Template")
+            .setColor(0x00FF99)
+            .setDescription(
+`- Game = 
+- OS = 
+- GPU = 
+- CPU = 
+- RAM = 
+- Drive =
+- Describe what you need =`
+            );
+    } else if (interaction.customId === 'ticket_request') {
+        templateEmbed
+            .setTitle("📦 Request Template")
+            .setColor(0x0099FF)
+            .setDescription(
+`- GAME NAME = 
+- RELEASE YEAR = 
+- O / R = # Original or Remastered, if the game hasn't Remaster, just type : "/"
+- REASON = # Explain why you need it / If it can be helpful for other people`
+            );
+    } else if (interaction.customId === 'ticket_other') {
+        templateEmbed
+            .setTitle("❓ Other Template")
+            .setColor(0xFFAA00)
+            .setDescription("Describe why you open the ticket, please.");
+    }
+
+    // Supprime les boutons précédents pour éviter double clic
+    if (interaction.message.editable) {
+        await interaction.message.edit({ components: [] }).catch(() => {});
+    }
+
+    // Envoie le template dans le ticket
+    await interaction.followUp({ embeds: [templateEmbed], ephemeral: false });
+
+    // Optionnel : envoie un DM à l'utilisateur
+    await interaction.user.send(`Your template has been posted in the ticket: <#${interaction.channel.id}>`).catch(() => {});
+}
+    // ----------------------------
+    // CLOSE TICKET
+    // ----------------------------
     if (interaction.customId === 'close_ticket') {
         await interaction.deferReply({ ephemeral: true });
         const channel = interaction.channel;
@@ -351,9 +465,13 @@ client.on('interactionCreate', async interaction => {
 client.on('messageCreate', async message => {
     if (!message.channel.name.startsWith('ticket-') || message.author.bot) return;
 
+    // STAFF BYPASS
+    if (STAFF_IDS.includes(message.author.id)) return;
+
     const youtubeRegex = /(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i;
     const linkRegex = /(https?:\/\/[^\s]+)/i;
 
+    // FORBIDDEN LINKS FILTER
     if (linkRegex.test(message.content) && !youtubeRegex.test(message.content)) {
         await message.delete().catch(() => {});
         const warnMsg = await message.channel.send(`<@${message.author.id}> ❌ Only YouTube links are allowed.`);
@@ -361,6 +479,7 @@ client.on('messageCreate', async message => {
         return;
     }
 
+    // FORBIDDEN FILES FILTER
     message.attachments.forEach(att => {
         const ext = att.name?.substring(att.name.lastIndexOf('.')).toLowerCase();
         if (!ALLOWED_FILE_EXTENSIONS.includes(ext)) {
@@ -380,7 +499,7 @@ client.on('ready', async () => {
     await sendTicketEmbed();
 
     try {
-        const BOT_VERSION = "3.0.0.A02042026"; //SIIIN CORE VERSION
+        const BOT_VERSION = "3.0.0.A02042026.1"; //SIIIN CORE VERSION
         const BOT_CHANGELOG = `
 # FIXES:
 • Autorestart
@@ -395,6 +514,8 @@ client.on('ready', async () => {
     ▪ RAILWAY_HEALTHCHECK_PATH
 • Force Update App Reboot
 • Force Update App Content
+• Ticket choices within the ticket
+• BYPASS settings for Staff
 
 # CHANGES:
 • Welcome | Fixes + Texts | Add lines
