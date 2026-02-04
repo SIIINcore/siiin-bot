@@ -271,7 +271,7 @@ To support us, please feel free to donate a bit. [Just Here](https://discord.com
 });
 
 // ================================
-// TICKETS | SUPPORT COMPLET
+// TICKETS | SUPPORT
 // ================================
 async function sendTicketEmbed() {
     const channel = await client.channels.fetch(SUPPORT_CHANNEL_ID);
@@ -348,7 +348,6 @@ client.on('interactionCreate', async interaction => {
             ]
         });
 
-        // EMBED TICKET CHOICE
         const embed = new EmbedBuilder()
             .setTitle(`🎫 Ticket open for:`)
             .setDescription(
@@ -364,21 +363,24 @@ client.on('interactionCreate', async interaction => {
                 new ButtonBuilder()
                     .setCustomId('ticket_support')
                     .setLabel('SUPPORT')
-                    .setStyle(ButtonStyle.Primary),
+                    .setStyle(ButtonStyle.Success),
                 new ButtonBuilder()
                     .setCustomId('ticket_request')
                     .setLabel('REQUEST')
-                    .setStyle(ButtonStyle.Success),
+                    .setStyle(ButtonStyle.Primary),
                 new ButtonBuilder()
                     .setCustomId('ticket_other')
                     .setLabel('OTHER')
-                    .setStyle(ButtonStyle.Secondary)
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('close_ticket')
+                    .setLabel('CLOSE')
+                    .setStyle(ButtonStyle.Danger)
             );
 
         await ticketChannel.send({ content: `<@${user.id}>`, embeds: [embed], components: [row] });
         await interaction.reply({ content: `✅ Your ticket has been created: ${ticketChannel}`, ephemeral: true });
 
-        // Log
         if (logChannel) {
             const logEmbed = new EmbedBuilder()
                 .setTitle("📂 Ticket opened")
@@ -390,17 +392,17 @@ client.on('interactionCreate', async interaction => {
     }
 
     // ----------------------------
-    // TICKET | CATEGORY BUTTONS
+    // TICKET CATEGORY BUTTONS (SUPPORT / REQUEST / OTHER)
     // ----------------------------
     if (['ticket_support','ticket_request','ticket_other'].includes(interaction.customId)) {
-    await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ ephemeral: true });
 
-    let templateEmbed = new EmbedBuilder();
-    if (interaction.customId === 'ticket_support') {
-        templateEmbed
-            .setTitle("🎮 Support Template")
-            .setColor(0x00FF99)
-            .setDescription(
+        let templateEmbed = new EmbedBuilder();
+        if (interaction.customId === 'ticket_support') {
+            templateEmbed
+                .setTitle("🎮 Support Template")
+                .setColor(0x00FF99)
+                .setDescription(
 `- Game = 
 - OS = 
 - GPU = 
@@ -408,40 +410,37 @@ client.on('interactionCreate', async interaction => {
 - RAM = 
 - Drive =
 - Describe what you need =`
-            );
-    } else if (interaction.customId === 'ticket_request') {
-        templateEmbed
-            .setTitle("📦 Request Template")
-            .setColor(0x0099FF)
-            .setDescription(
+                );
+        } else if (interaction.customId === 'ticket_request') {
+            templateEmbed
+                .setTitle("📦 Request Template")
+                .setColor(0x0099FF)
+                .setDescription(
 `- GAME NAME = 
 - RELEASE YEAR = 
 - O / R = # Original or Remastered, if the game hasn't Remaster, just type : "/"
 - REASON = # Explain why you need it / If it can be helpful for other people`
-            );
-    } else if (interaction.customId === 'ticket_other') {
-        templateEmbed
-            .setTitle("❓ Other Template")
-            .setColor(0xFFAA00)
-            .setDescription("Describe why you open the ticket, please.");
+                );
+        } else if (interaction.customId === 'ticket_other') {
+            templateEmbed
+                .setTitle("❓ Other Template")
+                .setColor(0xFFAA00)
+                .setDescription("Describe why did you open the ticket, please.");
+        }
+
+        // DELETE ALL BUTTONS, EXCEPT "CLOSE"
+        if (interaction.message.editable) {
+            const newComponents = interaction.message.components.map(row => {
+                const filteredButtons = row.components.filter(btn => btn.customId === 'close_ticket');
+                return new ActionRowBuilder().addComponents(filteredButtons);
+            });
+            await interaction.message.edit({ components: newComponents }).catch(() => {});
+        }
+
+        await interaction.followUp({ embeds: [templateEmbed], ephemeral: false });
+        await interaction.user.send(`Your template has been posted in the ticket, copy it, paste it, and complete it: <#${interaction.channel.id}>`).catch(() => {});
     }
 
-    // Delete all Buttons except "Close"
-    if (interaction.message.editable) {
-    const newComponents = interaction.message.components.map(row => {
-        // Filtre les boutons SUPPORT/REQUEST/OTHER
-        const filteredButtons = row.components.filter(btn => !['ticket_support','ticket_request','ticket_other'].includes(btn.customId));
-        return new ActionRowBuilder().addComponents(filteredButtons);
-    });
-    await interaction.message.edit({ components: newComponents }).catch(() => {});
-}
-
-    // Envoie le template dans le ticket
-    await interaction.followUp({ embeds: [templateEmbed], ephemeral: false });
-
-    // Optionnel : envoie un DM à l'utilisateur
-    await interaction.user.send(`Your template has been posted in the ticket: <#${interaction.channel.id}>`).catch(() => {});
-}
     // ----------------------------
     // CLOSE TICKET
     // ----------------------------
@@ -449,7 +448,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.deferReply({ ephemeral: true });
         const channel = interaction.channel;
 
-        await interaction.editReply({ content: "🕐 Ticket will be deleted in 5 minutes." });
+        await interaction.editReply({ content: "🕐 Ticket will be deleted in 1 minute." });
 
         if (logChannel) {
             const logEmbed = new EmbedBuilder()
@@ -460,7 +459,7 @@ client.on('interactionCreate', async interaction => {
             await logChannel.send({ embeds: [logEmbed] });
         }
 
-        setTimeout(async () => await channel.delete().catch(() => {}), 5 * 60 * 1000);
+        setTimeout(async () => await channel.delete().catch(() => {}), 60 * 1000); // 1 minute
     }
 });
 
