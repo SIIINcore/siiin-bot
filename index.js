@@ -426,10 +426,15 @@ client.on('interactionCreate', async interaction => {
             .setDescription("Describe why you open the ticket, please.");
     }
 
-    // Supprime les boutons précédents pour éviter double clic
+    // Delete all Buttons except "Close"
     if (interaction.message.editable) {
-        await interaction.message.edit({ components: [] }).catch(() => {});
-    }
+    const newComponents = interaction.message.components.map(row => {
+        // Filtre les boutons SUPPORT/REQUEST/OTHER
+        const filteredButtons = row.components.filter(btn => !['ticket_support','ticket_request','ticket_other'].includes(btn.customId));
+        return new ActionRowBuilder().addComponents(filteredButtons);
+    });
+    await interaction.message.edit({ components: newComponents }).catch(() => {});
+}
 
     // Envoie le template dans le ticket
     await interaction.followUp({ embeds: [templateEmbed], ephemeral: false });
