@@ -1,4 +1,10 @@
-// index.js
+// ================================
+// SIIIN CORE - UPDATE
+// ================================
+
+// ================================
+// IMPORTS & CONFIG
+// ================================
 const { 
     Client, 
     GatewayIntentBits, 
@@ -12,7 +18,9 @@ const {
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 require('dotenv').config();
 
-// ====== CHANNELS ======
+// ================================
+// CHANNELS ID
+// ================================
 const CHANNEL_FREEGAMES = '1237671753833254946';
 const CHANNEL_PROMOS = '1370860980594151534';
 const CHANNEL_WELCOME = '1033462383798140981';
@@ -20,15 +28,25 @@ const STATS_CHANNEL_ID = '1465938751208558643';
 const SUPPORT_CHANNEL_ID = "1468090646442279206";
 const TICKET_CATEGORY_ID = "1237716160842305566";
 const LOG_CHANNEL_ID = "1354801906161025236";
-const STAFF_IDS = ["847798063821225985", "400331452245344268"];
+
+// ================================
+// APP ID | SIIIN CORE
+// ================================
 const BOT_ID = "1465878128219128005";
+
+// ================================
+// STAFF ID
+// ================================
+const STAFF_IDS = ["847798063821225985", "400331452245344268"];
+
+// ================================
+// TICKETS RULES
+// ================================
 const ALLOWED_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.mov'];
 
-// Stockage pour éviter les doublons
-let postedGames = new Set();
-let postedPromos = new Set();
-
-// ====== CLIENT ======
+// ================================
+// DISCORD CLIENT | GATEWAY
+// ================================
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -38,7 +56,15 @@ const client = new Client({
     ]
 });
 
-// ====== FUNCTIONS API ======
+// ================================
+// ANTI SPAM | APP MESSAGES
+// ================================
+let postedGames = new Set();
+let postedPromos = new Set();
+
+// ================================
+// API | FREE GAMES
+// ================================
 async function fetchFreeGames() {
     try {
         const res = await fetch('https://www.gamerpower.com/api/giveaways?platform=epic-games-store');
@@ -57,6 +83,9 @@ async function fetchFreeGames() {
     }
 }
 
+// ================================
+// API | PROMOS
+// ================================
 async function fetchPromos() {
     try {
         const res = await fetch('https://www.cheapshark.com/api/1.0/deals?storeID=1&upperPrice=15');
@@ -79,7 +108,9 @@ async function fetchPromos() {
     }
 }
 
-// ====== POSTING ======
+// ================================
+// POST API | FREE GAMES
+// ================================
 async function postFreeGames(channel) {
     const games = await fetchFreeGames();
     for (const game of games) {
@@ -97,6 +128,9 @@ async function postFreeGames(channel) {
     }
 }
 
+// ================================
+// POST API | PROMOS
+// ================================
 async function postPromos(channel) {
     const promos = await fetchPromos();
     for (const promo of promos) {
@@ -118,7 +152,23 @@ async function postPromos(channel) {
     }
 }
 
-// ====== STATS ======
+// ================================
+// UPDATE FREE & PROMO [TRY]
+// ================================
+async function updateAll() {
+    console.log('📡 Updating free games and promos...');
+    const freeChannel = await client.channels.fetch(CHANNEL_FREEGAMES);
+    const promoChannel = await client.channels.fetch(CHANNEL_PROMOS);
+
+    await postFreeGames(freeChannel);
+    await postPromos(promoChannel);
+    await updateStatsEmbed(freeChannel.guild);
+    console.log('✅ Update completed.');
+}
+
+// ================================
+// STATS | DISCORD SERVER
+// ================================
 async function updateStatsEmbed(guild) {
     try {
         const channel = await guild.channels.fetch(STATS_CHANNEL_ID);
@@ -150,34 +200,21 @@ async function updateStatsEmbed(guild) {
     }
 }
 
-// ====== UPDATE ALL ======
-async function updateAll() {
-    console.log('📡 Updating free games and promos...');
-    const freeChannel = await client.channels.fetch(CHANNEL_FREEGAMES);
-    const promoChannel = await client.channels.fetch(CHANNEL_PROMOS);
-
-    await postFreeGames(freeChannel);
-    await postPromos(promoChannel);
-    await updateStatsEmbed(freeChannel.guild);
-    console.log('✅ Update completed.');
-}
-
-// ====== WELCOME ======
+// ================================
+// WELCOME | MESSAGE
+// ================================
 client.on('guildMemberAdd', async member => {
     try {
         const welcomeChannel = await client.channels.fetch(CHANNEL_WELCOME);
         const welcomeText = `
-# ───────────── ✦ W E L C O M E ✦ ─────────────
-
+# ─── ✦ W E L C O M E ✦ ───
 **<:CVW:1371269829847289876> SIIIN PATCHES & EXTRA**
 
 ${member}, Welcome to our server! <:CVW:1371269829847289876>
-
+Enjoy your stay and check out the links below!
 ▫▫▫▫ **C H E C K** ▫▫▫▫
 
-Enjoy your stay and check out the links below!
-
-───────────── ✦ INFORMATION ✦ ─────────────
+# ─── ✦ INFORMATION ✦ ───
 <:cryengine:1033530974107091035> [Information](https://discord.com/channels/1033462383798140978/1033506664810287134/1440058017545584871)
 <:cryengine:1033530974107091035> [Rules](https://discord.com/channels/1033462383798140978/1177257234787471422/1239185655683088395)
 <:cryengine:1033530974107091035> [Announcements](https://discord.com/channels/1033462383798140978/1237650687249092670)
@@ -186,13 +223,18 @@ Enjoy your stay and check out the links below!
 <:cryengine:1033530974107091035> [Crysis and Crysis Warhead](https://discord.com/channels/1033462383798140978/1371242516556415098/1371242762417995776)
 <:cryengine:1033530974107091035> [Crysis Remastered](https://discord.com/channels/1033462383798140978/1372560937000763484/1372565847591092385)
 
-───────────── ✦ PLATFORMS ✦ ─────────────
+# ─── ✦ PLATFORMS ✦ ───
 **STEAM | GOG | EA | UBISOFT | CD-ROM**
 
-───────────── ✦ SUPPORT ✦ ─────────────
+# ─── ✦ SUPPORT ✦ ───
 <#1468090646442279206> ► [Use this Template](https://discord.com/channels/1033462383798140978/1379581746466783385/1379584565466763307)
+Then post it there ► <#1468090646442279206>
+
+# ─── ✦ DONATIONS ✦ ───
+To support us, please feel free to donate a bit. [Just Here](https://discord.com/channels/1033462383798140978/1178517213444046948/1351344918546874461)
+[Paypal Direct link](https://www.paypal.com/paypalme/LunaSiiin?)
 `;
-        await welcomeChannel.send({ content: welcomeText });
+    await welcomeChannel.send({ content: welcomeText });
         await updateStatsEmbed(member.guild);
     } catch (err) {
         console.error('[Welcome] Error sending message:', err);
@@ -203,42 +245,9 @@ client.on('guildMemberRemove', async member => {
     await updateStatsEmbed(member.guild);
 });
 
-// ====== CLIENT READY ======
-client.on('ready', async () => {
-    console.log(`🤖 Bot connected: ${client.user.tag}`);
-
-    await sendTicketEmbed();
-
-    try {
-        const BOT_VERSION = "3.0.0.A02012026.2"; //SIIINVERSION
-        const BOT_CHANGELOG = `
-• Autoreboot set (24h)
-• Railway Host connect fixed (SIGTERM)
-• Stats fixed
-• Tickets system added and fixed
-`;
-        const logChannel = await client.channels.fetch(LOG_CHANNEL_ID);
-        if (logChannel) {
-            const embed = new EmbedBuilder()
-                .setTitle("🚀 Bot déployé / redémarré")
-                .setColor("#00FF99")
-                .setDescription(`**Version :** ${BOT_VERSION}\n\n**Changelog :**\n${BOT_CHANGELOG}`)
-                .setTimestamp();
-            await logChannel.send({ embeds: [embed] });
-        }
-    } catch (err) {
-        console.error("❌ Impossible d’envoyer le log dans Discord :", err);
-    }
-
-    updateAll();
-    setInterval(() => console.log('🟢 Bot alive:', new Date().toLocaleTimeString()), 60_000);
-    setInterval(updateAll, 10 * 60 * 1000);
-});
-
-// ====== LOGIN ======
-client.login(process.env.BOT_TOKEN);
-
-// ====== TICKETS ======
+// ================================
+// TICKETS | SUPPORT
+// ================================
 async function sendTicketEmbed() {
     const channel = await client.channels.fetch(SUPPORT_CHANNEL_ID);
     if (!channel) return console.warn("Unfound channel !");
@@ -265,7 +274,9 @@ async function sendTicketEmbed() {
     console.log("✅ Ticket got created !");
 }
 
-// ====== INTERACTIONS ======
+// ================================
+// TICKETS | INTERACTIONS
+// ================================
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
 
@@ -334,7 +345,9 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// ====== MESSAGE FILTER ======
+// ================================
+// TICKETS | MESSAGE FILTER
+// ================================
 client.on('messageCreate', async message => {
     if (!message.channel.name.startsWith('ticket-') || message.author.bot) return;
 
@@ -358,20 +371,79 @@ client.on('messageCreate', async message => {
     });
 });
 
-// ====== AUTO-REBOOT ======
+// ================================
+// DISCORD | CLIENT READY
+// ================================
+client.on('ready', async () => {
+    console.log(`🤖 Bot connected: ${client.user.tag}`);
+
+    await sendTicketEmbed();
+
+    try {
+        const BOT_VERSION = "3.0.0.A02042026"; //SIIIN CORE VERSION
+        const BOT_CHANGELOG = `
+# FIXES:
+• Autorestart
+• Stats
+• Tickets system
+
+# ADD:
+• Railway Variables :
+    ▪ AUTO_REBOOT_HOURS
+    ▪ NIXPACKS_NODE_VERSION
+    ▪ NODE_ENV
+    ▪ RAILWAY_HEALTHCHECK_PATH
+• Force Update App Reboot
+• Force Update App Content
+
+# CHANGES:
+• Welcome | Fixes + Texts | Add lines
+• APP Logs | English
+• API | Fixed links + Add settings | Optimizations
+• APP | Split Settings under new menus | Optimizations
+
+# REMOVED:
+• Draft Dependencies
+`;
+        const logChannel = await client.channels.fetch(LOG_CHANNEL_ID);
+        if (logChannel) {
+            const embed = new EmbedBuilder()
+                .setTitle("🚀 App Online / Restarted")
+                .setColor("#FF0000")
+                .setDescription(`**Release :** ${BOT_VERSION}\n\n**Changelog :**\n${BOT_CHANGELOG}`)
+                .setTimestamp();
+            await logChannel.send({ embeds: [embed] });
+        }
+    } catch (err) {
+        console.error("❌ Log failed to appear :", err);
+    }
+
+    updateAll();
+    setInterval(() => console.log('🟢 Bot alive:', new Date().toLocaleTimeString()), 60_000);
+    setInterval(updateAll, 10 * 60 * 1000);
+});
+
+// ================================
+// APP | AUTO RESTART
+// ================================
 const hours = Number(process.env.AUTO_REBOOT_HOURS || 24);
 const REBOOT_DELAY = hours * 60 * 60 * 1000;
 let shuttingDown = false;
-console.log(`⏱️ Auto reboot activé toutes les ${hours}h`);
+console.log(`⏱️ Autorestart every ${hours}h`);
 
 async function shutdown(reason) {
     if (shuttingDown) return;
     shuttingDown = true;
 
-    console.log(`🛑 Shutdown en cours (${reason})...`);
+    console.log(`🛑 Shutdown for (${reason})...`);
     try { if (client) await client.destroy(); } catch (err) { console.error(err); }
     finally { process.exit(0); }
 }
 
 process.on("SIGTERM", () => shutdown("SIGTERM Railway"));
-setTimeout(() => shutdown("Auto reboot programmé"), REBOOT_DELAY);
+setTimeout(() => shutdown("Auto restart"), REBOOT_DELAY);
+
+// ================================
+// DISCORD | CLIENT LOGIN
+// ================================
+client.login(process.env.BOT_TOKEN);
