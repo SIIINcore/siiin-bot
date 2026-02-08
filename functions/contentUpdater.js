@@ -1,9 +1,9 @@
 async function updateAll(client) {
-    console.log('📡 Updating...');
+    console.log('📡 Updating content...');
     
     try {
-        // Ici tu mettras tes fonctions de fetch de jeux
-        console.log('✅ Update simulation');
+        // Here you'll put your game fetching functions
+        console.log('✅ Update simulated');
         return [];
     } catch (err) {
         console.error('[UpdateAll] Error:', err.message);
