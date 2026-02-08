@@ -123,6 +123,30 @@ Please respect the rules for the happiness of Discord users.`
     }
 }
 
+// Fonction pour initialiser Express depuis ready.js
+function setupExpress(client) {
+    const express = require('express');
+    const app = express();
+    const PORT = process.env.PORT || 3000;
+
+    app.use(express.json());
+    
+    app.get(process.env.RAILWAY_HEALTHCHECK_PATH || '/', (req, res) => {
+        res.status(200).json({ 
+            status: 'ok', 
+            bot: client?.user?.tag || 'SIIIN Bot (Starting...)',
+            uptime: process.uptime(),
+            timestamp: new Date().toISOString()
+        });
+    });
+
+    app.listen(PORT, () => {
+        console.log(`🚀 Health check on port ${PORT}`);
+    });
+
+    return app;
+}
+
 module.exports = {
     name: 'ready',
     once: true,
@@ -131,6 +155,9 @@ module.exports = {
         console.log(`📊 Serving ${client.guilds.cache.size} server(s)`);
 
         try {
+            // Initialiser Express APRÈS que le client soit prêt
+            setupExpress(client);
+            
             // Send initial messages
             await sendTicketEmbed(client);
             await sendDonationMessage(client);
