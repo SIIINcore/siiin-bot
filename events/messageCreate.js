@@ -5,9 +5,9 @@ module.exports = {
     async execute(message, client) {
         if (message.author.bot || !message.guild) return;
         
-        // Ici on mettra l'automod et les tickets plus tard
-        // Pour l'instant, on garde la logique dans index.js
+        // Automod and tickets logic will be added later
+        // For now, just keep the logic in index.js
         
-        console.log(`📝 Message de ${message.author.tag}: ${message.content.substring(0, 50)}...`);
+        console.log(`📝 Message from ${message.author.tag}: ${message.content.substring(0, 50)}...`);
     }
 };
