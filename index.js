@@ -21,6 +21,27 @@ const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fet
 require('dotenv').config();
 
 // ================================
+// IMPORT DES CONSTANTES
+// ================================
+const { 
+    CHANNEL_FREEGAMES,
+    CHANNEL_PROMOS,
+    CHANNEL_FREETOPLAY,
+    CHANNEL_WELCOME,
+    STATS_CHANNEL_ID,
+    SUPPORT_CHANNEL_ID,
+    TICKET_CATEGORY_ID,
+    LOG_CHANNEL_ID,
+    CHAT_CHANNEL_ID,
+    DONATION_CHANNEL_ID,
+    BAN_LOG_CHANNEL_ID,
+    BOT_ID,
+    STAFF_IDS,
+    ALLOWED_FILE_EXTENSIONS,
+    BOT_VERSION
+} = require('./config/constants');
+
+// ================================
 // EXPRESS STARTUP
 // ================================
 const app = express();
@@ -39,36 +60,6 @@ app.get(process.env.RAILWAY_HEALTHCHECK_PATH || '/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Health check on port ${PORT}`);
 });
-
-// ================================
-// CHANNELS ID
-// ================================
-const CHANNEL_FREEGAMES = '1469855556356542649';
-const CHANNEL_PROMOS = '1469855518695624725';
-const CHANNEL_FREETOPLAY = '1468126872297672928';
-const CHANNEL_WELCOME = '1033462383798140981';
-const STATS_CHANNEL_ID = '1465938751208558643';
-const SUPPORT_CHANNEL_ID = "1468090646442279206";
-const TICKET_CATEGORY_ID = "1237716160842305566";
-const LOG_CHANNEL_ID = "1354801906161025236";
-const CHAT_CHANNEL_ID = "1189391329097166989";
-const DONATION_CHANNEL_ID = "1178517213444046948";
-const BAN_LOG_CHANNEL_ID = "1417568141428396063";
-
-// ================================
-// APP ID | SIIIN CORE
-// ================================
-const BOT_ID = "1465878128219128005";
-
-// ================================
-// STAFF ID
-// ================================
-const STAFF_IDS = ["847798063821225985", "400331452245344268"];
-
-// ================================
-// TICKETS RULES
-// ================================
-const ALLOWED_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.mov'];
 
 // ================================
 // AUTOMOD CONFIGURATION
