@@ -3,7 +3,7 @@ const { EmbedBuilder } = require('discord.js');
 const { AUTOMOD, STAFF_IDS, BAN_LOG_CHANNEL_ID } = require('../config/constants');
 
 let userWarnings = new Map();
-const MAX_WARNINGS = AUTOMOD_CONFIG.MAX_WARNINGS || 3;
+const MAX_WARNINGS = 3;
 
 async function handleAutomod(message) {
     if (STAFF_IDS.includes(message.author.id)) return false;
