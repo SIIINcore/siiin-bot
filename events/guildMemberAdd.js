@@ -34,8 +34,8 @@ module.exports = {
 
 ${member}, Welcome to our server! <:CVW:1371269829847289876>
 Enjoy your stay and check out the links below!
-▫▫▫▫ **C H E C K** ▫▫▫▫
 
+▫▫▫▫ **C H E C K** ▫▫▫▫
 # ─── ✦ INFORMATION ✦ ───
 <:cryengine:1033530974107091035> [Information](https://discord.com/channels/1033462383798140981/1033506664810287134/1440058017545584871)
 <:cryengine:1033530974107091035> [Rules](https://discord.com/channels/1033462383798140978/1177257234787471422/1468570201095274552)
@@ -49,11 +49,11 @@ Enjoy your stay and check out the links below!
 **STEAM | GOG | EA | UBISOFT | CD-ROM**
 
 # ─── ✦ SUPPORT ✦ ───
-**Check 1st the [Support rules](https://discord.com/channels/1033462383798140978/1379581746466783385/1379582509062426754) ► Then use ► The <#1468090646442279206> system.
+**Check 1st the [Support rules](https://discord.com/channels/1033462383798140978/1379581746466783385/1379582509062426754) ► Then use ► The <#1468090646442279206> system.**
 
 # ─── ✦ DONATIONS ✦ ───
 To support us, please feel free to donate a bit. [Just Here](https://discord.com/channels/1033462383798140981/1178517213444046948/1351344918546874461)
-[Paypal Direct link](https://www.paypal.com/paypalme/LunaSiiin?)
+[Donations Direct link](https://www.paypal.com/paypalme/LunaSiiin?)
 `;
 
             await welcomeChannel.send({ content: welcomeText });
