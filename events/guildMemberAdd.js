@@ -52,7 +52,7 @@ Enjoy your stay and check out the links below!
 **Check 1st the [Support rules](https://discord.com/channels/1033462383798140978/1379581746466783385/1379582509062426754) ► Then use ► The <#1468090646442279206> system.**
 
 # ─── ✦ DONATIONS ✦ ───
-To support us, please feel free to donate a bit. [Just Here](https://discord.com/channels/1033462383798140978/1178517213444046948/1469955649227198536)
+To support us, please feel free to donate a bit. Just Here : <#1178517213444046948>
 [Donations Direct link](https://www.paypal.com/paypalme/LunaSiiin?)
 `;
 
