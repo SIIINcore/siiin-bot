@@ -5,21 +5,11 @@
 // ================================
 // IMPORTS | CONFIG
 // ================================
-const { 
-    Client, 
-    GatewayIntentBits 
-} = require('discord.js');
+const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 require('dotenv').config();
-
-// ================================
-// IMPORT CONSTANTS
-// ================================
-const { 
-    BOT_VERSION
-} = require('./config/constants');
 
 // ================================
 // IMPORT HANDLERS
@@ -69,31 +59,32 @@ loadEvents(client);
 // ERROR HANDLING
 // ================================
 process.on('SIGTERM', async () => {
-    console.log('🛑 SIGTERM (Railway restart)');
+    console.log('🛑 SIGTERM signal received (Railway)...');
+    try {
+        const { LOG_CHANNEL_ID } = require('./config/constants');
+        const { EmbedBuilder } = require('discord.js');
+        const logChannel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+        if (logChannel) {
+            const embed = new EmbedBuilder()
+                .setTitle("⚠️ Railway Maintenance")
+                .setColor(0xFF9900)
+                .setDescription("The bot is restarting due to Railway maintenance.")
+                .setTimestamp();
+            await logChannel.send({ embeds: [embed] });
+        }
+    } catch (err) {}
     process.exit(0);
 });
 
 process.on('unhandledRejection', (error) => {
-    console.error('❌ Unhandled rejection:', error.message);
+    console.error('❌ Unhandled rejection:', error);
 });
-
-// ================================
-// AUTO RESTART (12h)
-// ================================
-const hours = Number(process.env.AUTO_REBOOT_HOURS || 12);
-if (hours > 0) {
-    setInterval(() => {
-        console.log(`🔄 Auto-restart after ${hours}h`);
-        // Soft restart logic
-    }, hours * 60 * 60 * 1000);
-    console.log(`⏱️ Auto-restart configured every ${hours}h`);
-}
 
 // ================================
 // START BOT
 // ================================
 client.login(process.env.BOT_TOKEN).catch(err => {
-    console.error('❌ Discord connection error:', err.message);
+    console.error('❌ Discord connection error:', err);
     process.exit(1);
 });
 
