@@ -124,6 +124,96 @@ Please respect the rules for the happiness of Discord users.`
     }
 }
 
+// AJOUT: Fonction pour mettre à jour le message d'information
+async function updateInformationMessage(client) {
+    try {
+        const INFO_CHANNEL_ID = '1033506664810287134'; // Channel information
+        const EXISTING_MESSAGE_ID = '1469900307688325242'; // ID du message existant
+        
+        const infoChannel = await client.channels.fetch(INFO_CHANNEL_ID).catch(() => null);
+        if (!infoChannel) {
+            console.warn('❌ Information channel not found');
+            return;
+        }
+
+        try {
+            const existingMessage = await infoChannel.messages.fetch(EXISTING_MESSAGE_ID);
+            
+            const updatedEmbed = new EmbedBuilder()
+                .setTitle("📋 SIIIN PATCHES & EXTRA - INFORMATION")
+                .setDescription(
+`Welcome to our community! Here you'll find patches, mods, and extras for various games.
+
+**Important links:**
+
+**Server Invitation Link:**
+\`\`\`
+https://discord.gg/eFBDgY2bup
+\`\`\`
+
+**Quick navigation:**
+• [Rules](https://discord.com/channels/1033462383798140978/1177257234787471422/1468570201095274552)
+• <#1237650687249092670>
+• <#1468090646442279206>
+• <#1469855556356542649>
+• <#1469855518695624725>
+
+**[Click to read from the Beginning](https://discord.com/channels/1033462383798140978/1033506664810287134/1440058017545584871)**`
+                )
+                .setColor(0x5865F2)
+                .setFooter({ text: 'SIIIN Community • Updated links' })
+                .setTimestamp();
+
+            await existingMessage.edit({ embeds: [updatedEmbed] });
+            console.log("✅ Information message updated!");
+            
+        } catch (err) {
+            console.error('❌ Cannot edit message, maybe wrong ID or permissions:', err.message);
+            // Fallback: créer un nouveau message
+            await sendNewInformationMessage(client, infoChannel);
+        }
+        
+    } catch (err) {
+        console.error('[UpdateInformationMessage] Error:', err.message);
+    }
+}
+
+// AJOUT: Fonction fallback si le message n'existe plus
+async function sendNewInformationMessage(client, channel) {
+    try {
+        const embed = new EmbedBuilder()
+            .setTitle("📋 SIIIN PATCHES & EXTRA - INFORMATION (UPDATED)")
+            .setDescription(
+`Welcome to our community! Here you'll find patches, mods, and extras for various games.
+
+**Important links:**
+
+**Server Invitation Link:**
+\`\`\`
+https://discord.gg/eFBDgY2bup
+\`\`\`
+
+**Quick navigation:**
+• [Rules](https://discord.com/channels/1033462383798140978/1177257234787471422/1468570201095274552)
+• <#1237650687249092670>
+• <#1468090646442279206>
+• <#1469855556356542649>
+• <#1469855518695624725>
+
+**[Click to read from the Beginning](https://discord.com/channels/1033462383798140978/1033506664810287134/1440058017545584871)**`
+            )
+            .setColor(0x5865F2)
+            .setFooter({ text: 'SIIIN Community • Updated links' })
+            .setTimestamp();
+
+        const newMessage = await channel.send({ embeds: [embed] });
+        console.log("✅ New information message sent!");
+        
+    } catch (err) {
+        console.error('[NewInformationMessage] Error:', err.message);
+    }
+}
+
 // Fonction pour initialiser Express depuis ready.js
 function setupExpress(client) {
     const express = require('express');
@@ -156,9 +246,13 @@ module.exports = {
         console.log(`📊 Serving ${client.guilds.cache.size} server(s)`);
 
         try {
+            // AJOUT: Mettre à jour le message d'information
+            await updateInformationMessage(client);
+            
+            // Initialiser les commandes staff
+            await staffCommands.init(client);
             
             // Send initial messages
-            await staffCommands.init(client);
             await sendTicketEmbed(client);
             await sendDonationMessage(client);
             
