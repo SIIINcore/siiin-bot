@@ -8,6 +8,7 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 require('dotenv').config();
+const staffCommands = require('./staffCommands');
 
 // ================================
 // EXPRESS STARTUP (Cut flag)
