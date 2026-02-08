@@ -1,8 +1,26 @@
-const fetch = require('node-fetch');
+// Utilisation de dynamic import pour node-fetch v3
+let fetch;
+
+(async () => {
+    try {
+        fetch = (await import('node-fetch')).default;
+    } catch (err) {
+        console.error('❌ Failed to load node-fetch:', err.message);
+        if (typeof globalThis.fetch === 'function') {
+            fetch = globalThis.fetch;
+        }
+    }
+})();
+
 const { delay, truncateText, generateGameHash } = require('../../utils/helpers');
 const API_CONFIG = require('../../config/apiConfig');
 
 async function fetchSteamPromos() {
+    if (!fetch) {
+        console.error('❌ fetch not initialized');
+        return [];
+    }
+    
     try {
         const res = await fetch(`${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.FEATURED}`, {
             headers: API_CONFIG.API_HEADERS,
@@ -43,6 +61,11 @@ async function fetchSteamPromos() {
 }
 
 async function fetchCheapSharkPromos() {
+    if (!fetch) {
+        console.error('❌ fetch not initialized');
+        return [];
+    }
+    
     try {
         const res = await fetch(`${API_CONFIG.CHEAP_SHARK.BASE_URL}/deals?storeID=1&upperPrice=15&pageSize=20`, {
             headers: API_CONFIG.API_HEADERS,
@@ -94,6 +117,12 @@ async function fetchCheapSharkPromos() {
 
 async function fetchAllPromos() {
     console.log('🔄 Fetching promotions from all platforms...');
+    
+    if (!fetch) {
+        console.error('❌ fetch not initialized yet, waiting...');
+        await delay(1000);
+        if (!fetch) return [];
+    }
     
     const allPromos = [];
     const seenHashes = new Set();
