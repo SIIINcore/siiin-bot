@@ -4,7 +4,7 @@ const path = require('path');
 module.exports = (client) => {
     const eventsPath = path.join(__dirname, '../events');
     
-    // Créer le dossier s'il n'existe pas
+    // Create folder if doesn't exist
     if (!fs.existsSync(eventsPath)) {
         fs.mkdirSync(eventsPath, { recursive: true });
     }
@@ -21,6 +21,6 @@ module.exports = (client) => {
             client.on(event.name, (...args) => event.execute(...args, client));
         }
         
-        console.log(`✅ Event chargé: ${event.name}`);
+        console.log(`✅ Event loaded: ${event.name}`);
     }
 };
