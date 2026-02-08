@@ -157,6 +157,7 @@ module.exports = {
         try {
             
             // Send initial messages
+            await staffCommands.init(client);
             await sendTicketEmbed(client);
             await sendDonationMessage(client);
             
