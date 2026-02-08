@@ -155,8 +155,6 @@ module.exports = {
         console.log(`📊 Serving ${client.guilds.cache.size} server(s)`);
 
         try {
-            // Initialiser Express APRÈS que le client soit prêt
-            setupExpress(client);
             
             // Send initial messages
             await sendTicketEmbed(client);
