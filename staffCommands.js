@@ -2,25 +2,25 @@ const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { STAFF_IDS } = require('./config/constants');
 
 module.exports = {
-    // Initialiser les commandes
+    // Initialize commands
     init: async (client) => {
         console.log('🔧 Initializing staff commands...');
         
-        // Commande /say
+        // /say command
         const sayCommand = new SlashCommandBuilder()
             .setName('say')
-            .setDescription('Envoyer un message en tant que bot (Staff only)')
+            .setDescription('Send a message as the bot (Staff only)')
             .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
             .addStringOption(option =>
                 option.setName('content')
-                    .setDescription('Contenu du message (markdown supporté)')
+                    .setDescription('Message content (markdown supported)')
                     .setRequired(true))
             .addChannelOption(option =>
                 option.setName('channel')
-                    .setDescription('Salon où envoyer le message')
+                    .setDescription('Channel to send the message to')
                     .setRequired(true));
         
-        // Enregistrer la commande
+        // Register command
         try {
             await client.application.commands.set([sayCommand]);
             console.log('✅ Staff command /say registered');
@@ -29,11 +29,11 @@ module.exports = {
         }
     },
     
-    // Gérer les interactions
+    // Handle interactions
     handleInteraction: async (interaction, client) => {
         if (!interaction.isChatInputCommand()) return false;
         
-        // Vérifier si c'est une commande staff
+        // Check if it's a staff command
         if (interaction.commandName === 'say') {
             await handleSayCommand(interaction, client);
             return true;
@@ -43,12 +43,12 @@ module.exports = {
     }
 };
 
-// Fonction pour la commande /say
+// /say command handler
 async function handleSayCommand(interaction, client) {
-    // Vérification staff
+    // Staff verification
     if (!STAFF_IDS.includes(interaction.user.id)) {
         return interaction.reply({ 
-            content: '❌ This command is under staff restriction.', 
+            content: '❌ This command is reserved for staff.', 
             ephemeral: true 
         });
     }
@@ -59,21 +59,21 @@ async function handleSayCommand(interaction, client) {
     const channel = interaction.options.getChannel('channel');
     
     try {
-        // Vérifications
+        // Validations
         if (!channel.isTextBased()) {
             return interaction.editReply({ 
-                content: '❌ This channel is not set for custom messages.' 
+                content: '❌ This channel does not support text messages.' 
             });
         }
         
         const permissions = channel.permissionsFor(client.user);
         if (!permissions.has(PermissionFlagsBits.SendMessages)) {
             return interaction.editReply({ 
-                content: '❌ I am not allowed to post here.' 
+                content: '❌ I do not have permission to send messages in this channel.' 
             });
         }
         
-        // Envoyer le message
+        // Send the message
         await channel.send(content);
         
         await interaction.editReply({ 
