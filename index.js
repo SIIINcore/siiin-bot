@@ -15,14 +15,14 @@ const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fet
 require('dotenv').config();
 
 // ================================
-// IMPORT DES CONSTANTES
+// IMPORT CONSTANTS
 // ================================
 const { 
     BOT_VERSION
 } = require('./config/constants');
 
 // ================================
-// IMPORT DES HANDLERS
+// IMPORT HANDLERS
 // ================================
 const loadEvents = require('./handlers/eventHandler');
 
@@ -36,14 +36,14 @@ app.use(express.json());
 app.get(process.env.RAILWAY_HEALTHCHECK_PATH || '/', (req, res) => {
     res.status(200).json({ 
         status: 'ok', 
-        bot: 'SIIIN Bot (modulaire)',
+        bot: 'SIIIN Bot (modular)',
         uptime: process.uptime(),
         timestamp: new Date().toISOString()
     });
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Health check sur le port ${PORT}`);
+    console.log(`🚀 Health check on port ${PORT}`);
 });
 
 // ================================
@@ -61,12 +61,12 @@ const client = new Client({
 });
 
 // ================================
-// CHARGEMENT DES ÉVÉNEMENTS
+// LOAD EVENTS
 // ================================
 loadEvents(client);
 
 // ================================
-// GESTION DES ERREURS
+// ERROR HANDLING
 // ================================
 process.on('SIGTERM', async () => {
     console.log('🛑 SIGTERM (Railway restart)');
@@ -83,10 +83,10 @@ process.on('unhandledRejection', (error) => {
 const hours = Number(process.env.AUTO_REBOOT_HOURS || 12);
 if (hours > 0) {
     setInterval(() => {
-        console.log(`🔄 Auto-restart après ${hours}h`);
-        // Soft restart logique
+        console.log(`🔄 Auto-restart after ${hours}h`);
+        // Soft restart logic
     }, hours * 60 * 60 * 1000);
-    console.log(`⏱️ Auto-restart configuré toutes les ${hours}h`);
+    console.log(`⏱️ Auto-restart configured every ${hours}h`);
 }
 
 // ================================
