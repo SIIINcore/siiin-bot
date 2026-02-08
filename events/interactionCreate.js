@@ -3,8 +3,8 @@ module.exports = {
     async execute(interaction, client) {
         if (!interaction.isButton()) return;
         
-        console.log(`🖱️ Interaction: ${interaction.customId} par ${interaction.user.tag}`);
+        console.log(`🖱️ Interaction: ${interaction.customId} by ${interaction.user.tag}`);
         
-        // Logique des tickets sera ajoutée plus tard
+        // Ticket logic will be added later
     }
 };
