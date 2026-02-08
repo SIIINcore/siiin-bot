@@ -1,13 +1,31 @@
-const { STAFF_IDS } = require('../config/constants');
+const { handleAutomod } = require('../functions/automod');
+const { handleTicketMessageFilter } = require('../functions/tickets');
+const { CHAT_CHANNEL_ID, STAFF_IDS } = require('../config/constants');
 
 module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
         if (message.author.bot || !message.guild) return;
         
-        // Automod and tickets logic will be added later
-        // For now, just keep the logic in index.js
+        // Automod
+        const isViolation = await handleAutomod(message);
+        if (isViolation) return;
         
-        console.log(`📝 Message from ${message.author.tag}: ${message.content.substring(0, 50)}...`);
+        // Ticket channel filter
+        if (message.channel.name.startsWith('ticket-')) {
+            await handleTicketMessageFilter(message);
+        }
+        
+        // Chat reminder system
+        if (message.channel.id === CHAT_CHANNEL_ID && !STAFF_IDS.includes(message.author.id)) {
+            setTimeout(async () => {
+                try {
+                    const { updateChatReminder } = require('./ready');
+                    await updateChatReminder(message.channel);
+                } catch (err) {
+                    console.error('[ChatReminder Update] Error:', err.message);
+                }
+            }, 1000);
+        }
     }
 };
