@@ -148,7 +148,7 @@ function setupExpress(client) {
 }
 
 module.exports = {
-    name: 'ready',
+    name: 'clientReady',
     once: true,
     async execute(client) {
         console.log(`🤖 ${client.user.tag} connected! (v${BOT_VERSION})`);
