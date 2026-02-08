@@ -8,6 +8,7 @@ const {
     BOT_VERSION,
     STATS_CHANNEL_ID
 } = require('../config/constants');
+const staffCommands = require('../staffCommands');
 
 let lastVersionLogged = null;
 
