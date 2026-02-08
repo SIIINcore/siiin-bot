@@ -9,7 +9,7 @@ async function sendTicketEmbed(client) {
             return;
         }
 
-        // Supprimer anciens messages du bot
+        // Delete old bot messages
         const messages = await channel.messages.fetch({ limit: 10 });
         for (const [, msg] of messages.filter(m => m.author.id === client.user.id)) {
             await msg.delete().catch(() => {});
