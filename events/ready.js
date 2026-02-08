@@ -6,28 +6,28 @@ module.exports = {
     name: 'ready',
     once: true,
     async execute(client) {
-        console.log(`🤖 ${client.user.tag} connecté ! (v${BOT_VERSION})`);
+        console.log(`🤖 ${client.user.tag} connected! (v${BOT_VERSION})`);
         
         try {
-            // Initialisation
+            // Initialization
             await sendTicketEmbed(client);
-            console.log('✅ Ticket embed envoyé');
+            console.log('✅ Ticket embed sent');
             
             await updateAll(client);
-            console.log('✅ Contenu initial mis à jour');
+            console.log('✅ Initial content updated');
             
             console.log(`📊 Serving ${client.guilds.cache.size} server(s)`);
             
             // Heartbeat
             setInterval(() => {
-                console.log('🟢 Bot actif:', new Date().toLocaleTimeString('en-US'));
+                console.log('🟢 Bot alive:', new Date().toLocaleTimeString('en-US'));
             }, 60000);
             
             // Auto update every 30 minutes
             setInterval(() => updateAll(client), 30 * 60 * 1000);
             
         } catch (error) {
-            console.error('❌ Erreur lors du ready:', error.message);
+            console.error('❌ Error during ready event:', error.message);
         }
     }
 };
