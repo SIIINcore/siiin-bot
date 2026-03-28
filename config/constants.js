@@ -14,6 +14,7 @@ module.exports = {
     CHAT_CHANNEL_ID: '1189391329097166989',
     DONATION_CHANNEL_ID: '1178517213444046948',
     BAN_LOG_CHANNEL_ID: '1417568141428396063',
+    TICKET_TRANSCRIPT_CHANNEL_ID: '1487595893803978772',
 
     // ========================
     // APP ID | SIIIN CORE
@@ -68,5 +69,7 @@ module.exports = {
     // ========================
     // BOT VERSION
     // ========================
-    BOT_VERSION: '3.0.1'
+    BOT_VERSION: process.env.RAILWAY_GIT_COMMIT_SHA
+        ? `git-${process.env.RAILWAY_GIT_COMMIT_SHA.slice(0, 7)}`
+        : require('../package.json').version
 };
