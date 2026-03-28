@@ -26,6 +26,41 @@ module.exports = {
     STAFF_IDS: ['847798063821225985', '400331452245344268'],
 
     // ========================
+    // AUTOMOD
+    // ========================
+    AUTOMOD: {
+        BAD_WORDS: [
+            /\bn+i+g+g+[ae3r]*\b/i,
+            /\bf+a+g+(?:g+o+t+)?\b/i,
+            /\bk+y+s+\b/i,
+            /\bretard(?:ed)?\b/i,
+            /\bslut\b/i,
+            /\bwhore\b/i
+        ],
+        DANGEROUS_LINKS: [
+            /discord\.(?:gift|gg)\/[^\s]+/i,
+            /steamcommunity\.[^\s]*\/tradeoffer/i,
+            /free[-_ ]?nitro/i,
+            /grabify/i,
+            /iplogger/i,
+            /bit\.ly\//i,
+            /tinyurl\.com\//i,
+            /t\.me\//i
+        ],
+        ALLOWED_DOMAINS: [
+            'youtube.com',
+            'youtu.be',
+            'discord.com',
+            'discord.gg',
+            'store.steampowered.com',
+            'steamcommunity.com',
+            'gog.com',
+            'epicgames.com',
+            'cheapshark.com'
+        ]
+    },
+
+    // ========================
     // TICKETS RULES
     // ========================
     ALLOWED_FILE_EXTENSIONS: ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.mov'],
@@ -33,5 +68,5 @@ module.exports = {
     // ========================
     // BOT VERSION
     // ========================
-    BOT_VERSION: '3.0.0.1'
+    BOT_VERSION: '3.0.1'
 };
