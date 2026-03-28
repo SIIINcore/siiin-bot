@@ -1,13 +1,10 @@
-// Utilisation de dynamic import pour node-fetch v3
 let fetch;
 
-// Dynamic import au démarrage
 (async () => {
     try {
         fetch = (await import('node-fetch')).default;
     } catch (err) {
         console.error('❌ Failed to load node-fetch:', err.message);
-        // Fallback à fetch global si disponible
         if (typeof globalThis.fetch === 'function') {
             fetch = globalThis.fetch;
         }
@@ -17,25 +14,40 @@ let fetch;
 const { delay, truncateText, generateGameHash } = require('../../utils/helpers');
 const API_CONFIG = require('../../config/apiConfig');
 
-async function fetchEpicFreeGames() {
+async function safeFetchJson(url, timeout = 15000) {
     if (!fetch) {
         console.error('❌ fetch not initialized');
-        return [];
+        return null;
     }
-    
+
     try {
-        const res = await fetch(`${API_CONFIG.GAMER_POWER.BASE_URL}${API_CONFIG.GAMER_POWER.EPIC_GAMES}`, {
+        const res = await fetch(url, {
             headers: API_CONFIG.API_HEADERS,
-            timeout: 10000
+            timeout
         });
-        
+
         if (!res.ok) {
-            console.error(`[EpicFree] HTTP Error: ${res.status}`);
-            return [];
+            console.error(`[HTTP] ${res.status} for ${url}`);
+            return null;
         }
-        
-        const data = await res.json();
-        return data.map(game => ({
+
+        return await res.json();
+    } catch (err) {
+        console.error('[FetchJson] Error:', err.message);
+        return null;
+    }
+}
+
+async function fetchEpicFreeGames() {
+    const data = await safeFetchJson(`${API_CONFIG.GAMER_POWER.BASE_URL}${API_CONFIG.GAMER_POWER.EPIC_GAMES}`, 10000);
+    if (!Array.isArray(data)) return [];
+
+    return data
+        .filter(game => {
+            const platforms = String(game.platforms || '').toLowerCase();
+            return platforms.includes('epic') && game.open_giveaway_url;
+        })
+        .map(game => ({
             id: `epic_${game.id}`,
             title: game.title,
             url: game.open_giveaway_url,
@@ -44,185 +56,136 @@ async function fetchEpicFreeGames() {
             platform: game.platforms,
             type: 'free',
             store: 'epic',
-            worth: game.worth ? `Value: $${game.worth}` : '',
-            endDate: game.end_date ? `Until: ${new Date(game.end_date).toLocaleDateString('en-US')}` : ''
-        })).filter(game => game.title && game.url);
-        
-    } catch (err) {
-        console.error('[EpicFree] API Error:', err.message);
-        return [];
-    }
+            worth: game.worth && game.worth !== 'N/A' ? `Value: ${game.worth}` : '',
+            endDate: game.end_date && game.end_date !== 'N/A'
+                ? `Until: ${new Date(game.end_date).toLocaleDateString('en-US')}`
+                : ''
+        }))
+        .filter(game => game.title && game.url);
 }
 
 async function fetchSteamFreeGames() {
-    if (!fetch) {
-        console.error('❌ fetch not initialized');
-        return [];
-    }
-    
-    try {
-        const res = await fetch(`${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.FEATURED}`, {
-            headers: API_CONFIG.API_HEADERS,
-            timeout: 15000
-        });
-        
-        if (!res.ok) {
-            console.error(`[SteamFree] HTTP Error: ${res.status}`);
-            return [];
+    const data = await safeFetchJson(`${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.FEATURED}`, 15000);
+    if (!data) return [];
+
+    const freeGames = [];
+    const categories = [data?.specials, data?.coming_soon, data?.top_sellers, data?.new_releases];
+
+    for (const category of categories) {
+        if (!category?.items) continue;
+
+        for (const game of category.items) {
+            const finalPrice = Number(game.final_price ?? -1);
+            const originalPrice = Number(game.original_price ?? -1);
+            const isFreeWeekend = finalPrice === 0 && originalPrice > 0;
+            const isPermanentFree = finalPrice === 0 && originalPrice === 0;
+
+            if (!isFreeWeekend && !isPermanentFree) continue;
+
+            freeGames.push({
+                id: `steam_free_${game.id}`,
+                title: game.name,
+                url: `https://store.steampowered.com/app/${game.id}`,
+                image: game.large_capsule_image || game.small_capsule_image,
+                description: truncateText(game.detailed_description || 'Free game on Steam', 400),
+                platform: 'Steam',
+                type: isFreeWeekend ? 'free_weekend' : 'free',
+                store: 'steam',
+                originalPrice: originalPrice > 0 ? `$${(originalPrice / 100).toFixed(2)}` : 'Free-to-Play',
+                discountPercent: isFreeWeekend ? 100 : 0
+            });
         }
-        
-        const data = await res.json();
-        const freeGames = [];
-        
-        const categories = [
-            data?.specials,
-            data?.coming_soon,
-            data?.top_sellers,
-            data?.new_releases
-        ];
-        
-        for (const category of categories) {
-            if (category?.items) {
-                for (const game of category.items) {
-                    if ((game.final_price === 0 && game.original_price > 0) || 
-                        (game.final_price === 0 && game.original_price === 0)) {
-                        
-                        const isFreeWeekend = game.final_price === 0 && game.original_price > 0;
-                        
-                        freeGames.push({
-                            id: `steam_free_${game.id}`,
-                            title: game.name,
-                            url: `https://store.steampowered.com/app/${game.id}`,
-                            image: game.large_capsule_image || game.small_capsule_image,
-                            description: truncateText(game.detailed_description || 'Free game on Steam', 400),
-                            platform: 'Steam',
-                            type: isFreeWeekend ? 'free_weekend' : 'free',
-                            store: 'steam',
-                            originalPrice: game.original_price > 0 ? `Normally: $${(game.original_price/100).toFixed(2)}` : 'Free-to-Play',
-                            discountPercent: isFreeWeekend ? 100 : 0
-                        });
-                    }
-                }
-            }
-        }
-        
-        return freeGames.slice(0, 10);
-        
-    } catch (err) {
-        console.error('[SteamFree] API Error:', err.message);
-        return [];
     }
+
+    return freeGames.slice(0, 10);
 }
 
 async function fetchFreeToPlayGames() {
-    if (!fetch) {
-        console.error('❌ fetch not initialized');
-        return [];
-    }
-    
-    try {
-        const res = await fetch(`${API_CONFIG.STEAMSPY.BASE_URL}${API_CONFIG.STEAMSPY.ALL_GAMES}`, {
-            headers: API_CONFIG.API_HEADERS,
-            timeout: 15000
-        });
-        
-        if (!res.ok) {
-            console.error(`[FreeToPlay] HTTP Error: ${res.status}`);
-            return [];
+    const data = await safeFetchJson(`${API_CONFIG.STEAMSPY.BASE_URL}?request=top100in2weeks`, 15000);
+    if (!data || typeof data !== 'object') return [];
+
+    const freeToPlayGames = [];
+    const entries = Object.entries(data)
+        .map(([appId, game]) => ({ appId, ...game }))
+        .sort((a, b) => Number(b.players_2weeks || 0) - Number(a.players_2weeks || 0));
+
+    for (const entry of entries) {
+        if (freeToPlayGames.length >= 10) break;
+
+        try {
+            const detailsData = await safeFetchJson(
+                `${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.APP_DETAILS(entry.appId)}`,
+                10000
+            );
+
+            const details = detailsData?.[entry.appId]?.data;
+            if (!details) continue;
+
+            const isGame = details.type === 'game';
+            const isFree = details.is_free === true;
+            const hasRealStorePage = Boolean(details.steam_appid && details.name && details.header_image);
+
+            if (!isGame || !isFree || !hasRealStorePage) continue;
+
+            freeToPlayGames.push({
+                id: `freetoplay_${entry.appId}`,
+                title: details.name,
+                url: `https://store.steampowered.com/app/${entry.appId}`,
+                image: details.header_image || details.capsule_image,
+                description: truncateText(details.short_description || details.detailed_description || 'Free-to-play game on Steam', 500),
+                platform: 'Steam',
+                type: 'freetoplay',
+                store: 'steam',
+                players: Number(entry.players_2weeks || 0),
+                trailer: Array.isArray(details.movies) && details.movies[0]?.mp4?.max ? details.movies[0].mp4.max : null,
+                website: details.website || null
+            });
+
+            await delay(250);
+        } catch (err) {
+            console.error(`[FreeToPlay] Error fetching details for ${entry.appId}:`, err.message);
         }
-        
-        const data = await res.json();
-        const freeToPlayGames = [];
-        
-        let count = 0;
-        for (const appId in data) {
-            const game = data[appId];
-            if (game.price === "0" && game.name && count < 15) {
-                try {
-                    const detailsRes = await fetch(
-                        `${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.APP_DETAILS(appId)}`,
-                        { headers: API_CONFIG.API_HEADERS, timeout: 10000 }
-                    );
-                    
-                    if (detailsRes.ok) {
-                        const detailsData = await detailsRes.json();
-                        const gameDetails = detailsData[appId]?.data;
-                        
-                        if (gameDetails && gameDetails.type === "game") {
-                            freeToPlayGames.push({
-                                id: `freetoplay_${appId}`,
-                                title: game.name,
-                                url: `https://store.steampowered.com/app/${appId}`,
-                                image: gameDetails.header_image || gameDetails.capsule_image,
-                                description: truncateText(gameDetails.short_description || gameDetails.detailed_description || '', 500),
-                                platform: 'Steam',
-                                type: 'freetoplay',
-                                store: 'steam',
-                                players: game.players_2weeks || 0,
-                                trailer: gameDetails.movies ? `https://www.youtube.com/watch?v=${gameDetails.movies[0]?.id}` : null,
-                                website: gameDetails.website || null
-                            });
-                            count++;
-                        }
-                    }
-                    
-                    await delay(500);
-                } catch (err) {
-                    console.error(`[FreeToPlay] Error fetching details for ${appId}:`, err.message);
-                }
-            }
-        }
-        
-        freeToPlayGames.sort((a, b) => b.players - a.players);
-        return freeToPlayGames.slice(0, 10);
-        
-    } catch (err) {
-        console.error('[FreeToPlay] API Error:', err.message);
-        return [];
     }
+
+    return freeToPlayGames;
 }
 
 async function fetchAllFreeGames() {
     console.log('🔄 Fetching free games...');
-    
+
     if (!fetch) {
         console.error('❌ fetch not initialized yet, waiting...');
         await delay(1000);
         if (!fetch) return [];
     }
-    
+
     const allGames = [];
     const seenHashes = new Set();
-    
+
     try {
         console.log('📥 Fetching Epic Games...');
         const epicGames = await fetchEpicFreeGames();
-        
         for (const game of epicGames) {
             const hash = generateGameHash(game.title, '0', 'epic');
-            if (!seenHashes.has(hash)) {
-                seenHashes.add(hash);
-                allGames.push(game);
-            }
+            if (seenHashes.has(hash)) continue;
+            seenHashes.add(hash);
+            allGames.push(game);
         }
-        
+
         await delay(1000);
-        
+
         console.log('📥 Fetching Steam...');
         const steamGames = await fetchSteamFreeGames();
-        
         for (const game of steamGames) {
             const hash = generateGameHash(game.title, '0', 'steam');
-            if (!seenHashes.has(hash)) {
-                seenHashes.add(hash);
-                allGames.push(game);
-            }
+            if (seenHashes.has(hash)) continue;
+            seenHashes.add(hash);
+            allGames.push(game);
         }
-        
     } catch (err) {
         console.error('[AllFreeGames] Global error:', err.message);
     }
-    
+
     console.log(`✅ ${allGames.length} free games found`);
     return allGames;
 }
