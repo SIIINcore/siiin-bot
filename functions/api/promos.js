@@ -1,4 +1,3 @@
-// Utilisation de dynamic import pour node-fetch v3
 let fetch;
 
 (async () => {
@@ -12,36 +11,51 @@ let fetch;
     }
 })();
 
-const { delay, truncateText, generateGameHash } = require('../../utils/helpers');
+const { delay, truncateText } = require('../../utils/helpers');
 const API_CONFIG = require('../../config/apiConfig');
 
-async function fetchSteamPromos() {
+async function safeFetchJson(url, timeout = 15000) {
     if (!fetch) {
         console.error('❌ fetch not initialized');
-        return [];
+        return null;
     }
-    
+
     try {
-        const res = await fetch(`${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.FEATURED}`, {
+        const res = await fetch(url, {
             headers: API_CONFIG.API_HEADERS,
-            timeout: 15000
+            timeout
         });
-        
+
         if (!res.ok) {
-            console.error(`[SteamPromos] HTTP Error: ${res.status}`);
-            return [];
+            console.error(`[HTTP] ${res.status} for ${url}`);
+            return null;
         }
-        
-        const data = await res.json();
-        const specials = data?.specials?.items || [];
-        
-        return specials.map(game => {
-            const discountPercent = Math.round(game.discount_percent || 0);
-            const finalPrice = game.final_price / 100;
-            const originalPrice = game.original_price / 100;
-            
+
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            console.error(`[FetchJson] Non-JSON response for ${url}`);
+            return null;
+        }
+
+        return await res.json();
+    } catch (err) {
+        console.error('[FetchJson] Error:', err.message);
+        return null;
+    }
+}
+
+async function fetchSteamPromos() {
+    const data = await safeFetchJson(`${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.FEATURED}`, 15000);
+    const specials = data?.specials?.items || [];
+
+    return specials
+        .map(game => {
+            const discountPercent = Math.round(Number(game.discount_percent || 0));
+            const finalPrice = Number(game.final_price || 0) / 100;
+            const originalPrice = Number(game.original_price || 0) / 100;
+
             return {
-                id: `steam_${game.id}`,
+                id: `steam_${game.id}_${discountPercent}_${finalPrice.toFixed(2)}`,
                 title: game.name,
                 url: `https://store.steampowered.com/app/${game.id}`,
                 image: game.large_capsule_image || game.small_capsule_image,
@@ -52,51 +66,33 @@ async function fetchSteamPromos() {
                 store: 'steam',
                 description: truncateText(game.detailed_description || '', 300)
             };
-        }).filter(game => game.discountPercent >= 40 && game.price > 0);
-        
-    } catch (err) {
-        console.error('[SteamPromos] API Error:', err.message);
-        return [];
-    }
+        })
+        .filter(game => game.discountPercent >= 40 && Number(game.price) > 0);
 }
 
-async function fetchCheapSharkPromos() {
-    if (!fetch) {
-        console.error('❌ fetch not initialized');
-        return [];
-    }
-    
-    try {
-        const res = await fetch(`${API_CONFIG.CHEAP_SHARK.BASE_URL}/deals?storeID=1&upperPrice=15&pageSize=20`, {
-            headers: API_CONFIG.API_HEADERS,
-            timeout: 10000
-        });
-        
-        if (!res.ok) {
-            console.error(`[CheapShark] HTTP Error: ${res.status}`);
-            return [];
-        }
-        
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            console.error('[CheapShark] Non-JSON response received');
-            return [];
-        }
-        
-        const data = await res.json();
-        
-        return data.filter(game => {
-            const normalPrice = parseFloat(game.normalPrice);
-            const salePrice = parseFloat(game.salePrice);
+async function fetchCheapSharkStorePromos(storeId, storeName) {
+    const data = await safeFetchJson(
+        `${API_CONFIG.CHEAP_SHARK.BASE_URL}/deals?storeID=${storeId}&upperPrice=20&pageSize=20`,
+        10000
+    );
+
+    if (!Array.isArray(data)) return [];
+
+    return data
+        .filter(game => {
+            const normalPrice = parseFloat(game.normalPrice || '0');
+            const salePrice = parseFloat(game.salePrice || '0');
+            if (!normalPrice || !Number.isFinite(normalPrice) || !Number.isFinite(salePrice)) return false;
             const discount = ((normalPrice - salePrice) / normalPrice) * 100;
-            return discount >= 40 && salePrice <= 15;
-        }).map(game => {
+            return discount >= 40 && salePrice > 0 && salePrice <= 20;
+        })
+        .map(game => {
             const normalPrice = parseFloat(game.normalPrice);
             const salePrice = parseFloat(game.salePrice);
             const discountPercent = Math.round(((normalPrice - salePrice) / normalPrice) * 100);
-            
+
             return {
-                id: `cheapshark_${game.dealID}`,
+                id: `${storeName}_${game.dealID}`,
                 title: game.title,
                 url: `https://www.cheapshark.com/redirect?dealID=${game.dealID}`,
                 image: game.thumb,
@@ -104,64 +100,51 @@ async function fetchCheapSharkPromos() {
                 normalPrice: normalPrice.toFixed(2),
                 discountPercent,
                 type: 'promo',
-                store: 'cheapshark',
-                steamRating: game.steamRatingText || 'N/A'
+                store: storeName,
+                steamRating: game.steamRatingText || 'N/A',
+                description: 'Limited time promotion.'
             };
         });
-        
-    } catch (err) {
-        console.error('[CheapShark] API Error:', err.message);
-        return [];
-    }
 }
 
 async function fetchAllPromos() {
     console.log('🔄 Fetching promotions from all platforms...');
-    
+
     if (!fetch) {
         console.error('❌ fetch not initialized yet, waiting...');
         await delay(1000);
         if (!fetch) return [];
     }
-    
+
     const allPromos = [];
-    const seenHashes = new Set();
-    
+    const seenKeys = new Set();
+
     try {
-        console.log('📥 Fetching Steam...');
-        const steamPromos = await fetchSteamPromos();
-        
-        for (const promo of steamPromos) {
-            const hash = generateGameHash(promo.title, promo.price, 'steam');
-            if (!seenHashes.has(hash)) {
-                seenHashes.add(hash);
+        const batches = await Promise.all([
+            fetchSteamPromos(),
+            fetchCheapSharkStorePromos(API_CONFIG.CHEAP_SHARK.STORES.STEAM, 'cheapshark-steam'),
+            fetchCheapSharkStorePromos(API_CONFIG.CHEAP_SHARK.STORES.GOG, 'gog'),
+            fetchCheapSharkStorePromos(API_CONFIG.CHEAP_SHARK.STORES.EPIC, 'epic')
+        ]);
+
+        for (const promos of batches) {
+            for (const promo of promos) {
+                const dedupeKey = `${promo.title.toLowerCase()}_${promo.store}_${promo.price}_${promo.discountPercent}`;
+                if (seenKeys.has(dedupeKey)) continue;
+                seenKeys.add(dedupeKey);
                 allPromos.push(promo);
             }
         }
-        
-        await delay(1000);
-        
-        console.log('📥 Fetching CheapShark...');
-        const cheapSharkPromos = await fetchCheapSharkPromos();
-        
-        for (const promo of cheapSharkPromos) {
-            const hash = generateGameHash(promo.title, promo.price, 'cheapshark');
-            if (!seenHashes.has(hash.replace('_cheapshark', '_steam')) && !seenHashes.has(hash)) {
-                seenHashes.add(hash);
-                allPromos.push(promo);
-            }
-        }
-        
     } catch (err) {
         console.error('[AllPromos] Global error:', err.message);
     }
-    
+
     console.log(`✅ ${allPromos.length} promotions found`);
     return allPromos;
 }
 
 module.exports = {
     fetchSteamPromos,
-    fetchCheapSharkPromos,
+    fetchCheapSharkStorePromos,
     fetchAllPromos
 };
