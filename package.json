@@ -1,13 +1,19 @@
 {
   "name": "siiin-bot",
-  "version": "3.0.0.1",
+  "version": "3.0.2",
   "description": "SIIIN Core Discord Bot with automod, free games, promotions and ticket system",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["discord", "bot", "gaming", "automod", "tickets"],
+  "keywords": [
+    "discord",
+    "bot",
+    "gaming",
+    "automod",
+    "tickets"
+  ],
   "author": "SIIIN Team",
   "license": "ISC",
   "type": "commonjs",
