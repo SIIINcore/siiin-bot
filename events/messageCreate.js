@@ -1,18 +1,11 @@
 const { handleAutomod } = require('../functions/automod');
 const { handleTicketMessageFilter } = require('../functions/tickets');
 const { CHAT_CHANNEL_ID, STAFF_IDS } = require('../config/constants');
-const { ensureTranslationHelperForMessage } = require('../functions/translation');
 
 module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
-        if (!message.guild) return;
-
-        if ((message.author.id === client.user.id || STAFF_IDS.includes(message.author.id)) && !message.components?.length) {
-            await ensureTranslationHelperForMessage(message, client);
-        }
-
-        if (message.author.bot) return;
+        if (message.author.bot || !message.guild) return;
         
         // Automod
         const isViolation = await handleAutomod(message);
