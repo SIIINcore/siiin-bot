@@ -4,24 +4,31 @@ const { EmbedBuilder } = require('discord.js');
 const {
     CHANNEL_FREEGAMES,
     CHANNEL_PROMOS,
-    CHANNEL_FREETOPLAY
+    CHANNEL_FREETOPLAY,
+    CHANNEL_MOBILE
 } = require('../config/constants');
 const { fetchAllFreeGames, fetchFreeToPlayGames } = require('./api/freeGames');
 const { fetchAllPromos } = require('./api/promos');
+const { fetchAllMobileTopApps } = require('./api/mobileTop');
 const { delay, truncateText } = require('../utils/helpers');
 
 const STATE_DIR = path.join(__dirname, '..', 'data');
 const STATE_FILE = path.join(STATE_DIR, 'posted-content.json');
 const MAX_SAVED_IDS = 2000;
 
+function defaultStatePayload() {
+    return {
+        postedGames: [],
+        postedPromos: [],
+        postedFreeToPlay: [],
+        postedMobile: []
+    };
+}
+
 function ensureStateFile() {
     if (!fs.existsSync(STATE_DIR)) fs.mkdirSync(STATE_DIR, { recursive: true });
     if (!fs.existsSync(STATE_FILE)) {
-        fs.writeFileSync(STATE_FILE, JSON.stringify({
-            postedGames: [],
-            postedPromos: [],
-            postedFreeToPlay: []
-        }, null, 2), 'utf8');
+        fs.writeFileSync(STATE_FILE, JSON.stringify(defaultStatePayload(), null, 2), 'utf8');
     }
 }
 
@@ -31,16 +38,18 @@ function loadState() {
         const raw = fs.readFileSync(STATE_FILE, 'utf8');
         const parsed = JSON.parse(raw);
         return {
-            postedGames: new Set(parsed.postedGames || []),
-            postedPromos: new Set(parsed.postedPromos || []),
-            postedFreeToPlay: new Set(parsed.postedFreeToPlay || [])
+            postedGames: new Set(parsed.postedGames || parsed.freeGames || []),
+            postedPromos: new Set(parsed.postedPromos || parsed.promos || []),
+            postedFreeToPlay: new Set(parsed.postedFreeToPlay || []),
+            postedMobile: new Set(parsed.postedMobile || parsed.mobile || [])
         };
     } catch (err) {
         console.error('[ContentState] Failed to load state:', err.message);
         return {
             postedGames: new Set(),
             postedPromos: new Set(),
-            postedFreeToPlay: new Set()
+            postedFreeToPlay: new Set(),
+            postedMobile: new Set()
         };
     }
 }
@@ -57,7 +66,8 @@ function saveState() {
         const payload = {
             postedGames: trimSet(postedGames),
             postedPromos: trimSet(postedPromos),
-            postedFreeToPlay: trimSet(postedFreeToPlay)
+            postedFreeToPlay: trimSet(postedFreeToPlay),
+            postedMobile: trimSet(postedMobile)
         };
         fs.writeFileSync(STATE_FILE, JSON.stringify(payload, null, 2), 'utf8');
     } catch (err) {
@@ -69,6 +79,7 @@ const initialState = loadState();
 let postedGames = initialState.postedGames;
 let postedPromos = initialState.postedPromos;
 let postedFreeToPlay = initialState.postedFreeToPlay;
+let postedMobile = initialState.postedMobile;
 
 async function postFreeGames(channel) {
     try {
@@ -79,9 +90,12 @@ async function postFreeGames(channel) {
             if (postedGames.has(game.id)) continue;
 
             const platformConfig = {
-                epic: { color: '#00AAFF', emoji: '🎮', name: 'Epic Games' },
-                steam: { color: '#1B2838', emoji: '🎮', name: 'Steam' },
-                other: { color: '#7289DA', emoji: '🆓', name: game.platform || 'PC' }
+                epic: { color: '#00AAFF', emoji: '🎮' },
+                steam: { color: '#1B2838', emoji: '🎮' },
+                'cs-gog': { color: '#8636ff', emoji: '🟣' },
+                'cs-ea': { color: '#ff5c7a', emoji: '🧩' },
+                'cs-ubisoft': { color: '#4cc9f0', emoji: '🌀' },
+                other: { color: '#7289DA', emoji: '🆓' }
             };
 
             const config = platformConfig[game.store] || platformConfig.other;
@@ -90,7 +104,7 @@ async function postFreeGames(channel) {
             const embed = new EmbedBuilder()
                 .setTitle(`${config.emoji} ${game.title}`)
                 .setURL(game.url)
-                .setDescription(truncateText(game.description, 300) || 'Free game available now.')
+                .setDescription(truncateText(game.description, 300) || 'Free content available now.')
                 .setColor(config.color)
                 .setTimestamp();
 
@@ -100,20 +114,21 @@ async function postFreeGames(channel) {
                 embed
                     .addFields(
                         { name: 'Type', value: 'FREE WEEKEND', inline: true },
-                        { name: 'Platform', value: config.name, inline: true },
+                        { name: 'Store', value: game.sourceLabel || game.platform || 'Store', inline: true },
                         { name: 'Original Price', value: game.originalPrice || 'Unknown', inline: true }
                     )
-                    .setFooter({ text: 'Limited-time free access' });
+                    .setFooter({ text: `${game.sourceLabel || 'Store'} • Limited-time free access` });
             } else {
                 const fields = [
-                    { name: 'Platform', value: config.name, inline: true },
+                    { name: 'Store', value: game.sourceLabel || game.platform || 'Store', inline: true },
                     { name: 'Status', value: 'FREE', inline: true }
                 ];
 
-                if (game.worth) fields.push({ name: 'Value', value: game.worth, inline: true });
+                if (game.originalPrice) fields.push({ name: 'Original Price', value: game.originalPrice, inline: true });
+                if (game.worth) fields.push({ name: 'Extra', value: game.worth, inline: false });
                 if (game.endDate) fields.push({ name: 'Ends', value: game.endDate, inline: false });
 
-                embed.addFields(fields).setFooter({ text: `${config.name} • Free game` });
+                embed.addFields(fields).setFooter({ text: `${game.sourceLabel || game.platform || 'Store'} • Free content` });
             }
 
             await channel.send({ embeds: [embed] });
@@ -140,16 +155,11 @@ async function postPromos(channel) {
             const storeEmoji = {
                 steam: '🎮',
                 'cheapshark-steam': '🦈',
-                gog: '🟣',
-                epic: '🟦'
+                'cs-gog': '🟣',
+                'cs-epic': '🟦',
+                'cs-ea': '🧩',
+                'cs-ubisoft': '🌀'
             }[promo.store] || '🏪';
-
-            const storeName = {
-                steam: 'Steam',
-                'cheapshark-steam': 'CheapShark / Steam',
-                gog: 'GOG',
-                epic: 'Epic Games'
-            }[promo.store] || promo.store.toUpperCase();
 
             const embed = new EmbedBuilder()
                 .setTitle(`${storeEmoji} ${promo.title}`)
@@ -157,9 +167,9 @@ async function postPromos(channel) {
                 .setDescription(truncateText(promo.description || 'Limited-time promotion.', 200))
                 .setColor(
                     promo.discountPercent >= 70 ? '#FF0000' :
-                    promo.discountPercent >= 50 ? '#FF9900' : '#00FF00'
+                    promo.discountPercent >= 50 ? '#FF9900' : '#00FF99'
                 )
-                .setFooter({ text: `${storeName} • Limited promotion` })
+                .setFooter({ text: `${promo.sourceLabel || 'Store'} • Limited promotion` })
                 .setTimestamp();
 
             if (promo.image) embed.setImage(promo.image);
@@ -168,7 +178,7 @@ async function postPromos(channel) {
                 { name: 'Original Price', value: `$${promo.normalPrice}`, inline: true },
                 { name: 'Sale Price', value: `$${promo.price}`, inline: true },
                 { name: 'Discount', value: `${promo.discountPercent}% OFF`, inline: true },
-                { name: 'Platform', value: storeName, inline: true }
+                { name: 'Store', value: promo.sourceLabel || promo.store.toUpperCase(), inline: true }
             ];
 
             if (promo.steamRating && promo.steamRating !== 'N/A') {
@@ -235,6 +245,45 @@ async function postFreeToPlayGames(channel) {
     }
 }
 
+async function postMobileApps(channel) {
+    try {
+        const apps = await fetchAllMobileTopApps();
+        let postedCount = 0;
+
+        for (const app of apps) {
+            if (postedMobile.has(app.id)) continue;
+
+            const color = app.platform === 'Apple' ? '#f5f5f7' : '#66c2ff';
+            const emoji = app.platform === 'Apple' ? '🍎' : '🤖';
+
+            const embed = new EmbedBuilder()
+                .setTitle(`${emoji} ${app.title}`)
+                .setURL(app.url)
+                .setDescription(truncateText(app.description || 'Top free mobile app.', 240))
+                .setColor(color)
+                .addFields(
+                    { name: 'Platform', value: app.sourceLabel || app.platform, inline: true },
+                    { name: 'Rank', value: `#${app.rank}`, inline: true },
+                    { name: 'Developer', value: truncateText(app.developer || 'Unknown developer', 100), inline: true }
+                )
+                .setFooter({ text: `${app.footerSource || 'Source'} • Top Free` })
+                .setTimestamp();
+
+            if (app.image) embed.setThumbnail(app.image);
+
+            await channel.send({ embeds: [embed] });
+            postedMobile.add(app.id);
+            postedCount += 1;
+            saveState();
+            await delay(700);
+        }
+
+        console.log(postedCount > 0 ? `✅ ${postedCount} new mobile apps posted` : 'ℹ️ No new mobile apps to post');
+    } catch (err) {
+        console.error('[PostMobileApps] Error:', err.message);
+    }
+}
+
 async function updateAll(client) {
     console.log('📡 Updating free games and promotions...');
 
@@ -242,14 +291,17 @@ async function updateAll(client) {
         const freeChannel = await client.channels.fetch(CHANNEL_FREEGAMES).catch(() => null);
         const promoChannel = await client.channels.fetch(CHANNEL_PROMOS).catch(() => null);
         const freeToPlayChannel = await client.channels.fetch(CHANNEL_FREETOPLAY).catch(() => null);
+        const mobileChannel = await client.channels.fetch(CHANNEL_MOBILE).catch(() => null);
 
         if (!freeChannel) console.error('❌ Free games channel not found');
         if (!promoChannel) console.error('❌ Promotions channel not found');
         if (!freeToPlayChannel) console.error('❌ Free-to-play channel not found');
+        if (!mobileChannel) console.error('❌ Mobile channel not found');
 
         if (freeChannel) await postFreeGames(freeChannel);
         if (promoChannel) await postPromos(promoChannel);
         if (freeToPlayChannel) await postFreeToPlayGames(freeToPlayChannel);
+        if (mobileChannel) await postMobileApps(mobileChannel);
 
         console.log('✅ Update completed.');
     } catch (err) {
@@ -260,7 +312,6 @@ async function updateAll(client) {
 async function softRestart(client) {
     console.log('🔄 Soft restart of functions...');
     try {
-        // Keep persisted IDs so the bot does not repost old content after a soft restart.
         await updateAll(client);
         console.log('✅ Soft restart completed');
     } catch (err) {
@@ -273,5 +324,6 @@ module.exports = {
     softRestart,
     postedGames,
     postedPromos,
-    postedFreeToPlay
+    postedFreeToPlay,
+    postedMobile
 };
