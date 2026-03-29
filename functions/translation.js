@@ -12,7 +12,8 @@ const {
     STAFF_IDS,
     TRANSLATION_CHANNEL_IDS,
     TRANSLATION_DAILY_LIMIT,
-    BOT_ID
+    BOT_ID,
+    TRANSLATION_MIN_LENGTH
 } = require('../config/constants');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
@@ -93,9 +94,15 @@ function isTranslationChannel(channelId) {
     return TRANSLATION_CHANNEL_IDS.includes(channelId);
 }
 
+function getMessageSourceTextLength(message) {
+    const text = extractMessageText(message);
+    return text.trim().length;
+}
+
 function isEligibleSourceMessage(message, client) {
     if (!message || !message.guild) return false;
     if (!isTranslationChannel(message.channelId)) return false;
+    if (getMessageSourceTextLength(message) <= TRANSLATION_MIN_LENGTH) return false;
     if (message.author.id === client.user.id) {
         if (message.components?.length) return false;
         if (message.embeds?.some(embed => embed.footer?.text === HELPER_MARKER)) return false;
@@ -148,22 +155,6 @@ async function ensureTranslationHelperForMessage(message, client) {
     }
 }
 
-async function ensureHelpersForChannel(channel, client, limit = 12) {
-    try {
-        if (!channel || !isTranslationChannel(channel.id)) return;
-        const messages = await channel.messages.fetch({ limit }).catch(() => null);
-        if (!messages) return;
-
-        const sorted = Array.from(messages.values()).sort((a, b) => a.createdTimestamp - b.createdTimestamp);
-        for (const message of sorted) {
-            if (isEligibleSourceMessage(message, client)) {
-                await ensureTranslationHelperForMessage(message, client);
-            }
-        }
-    } catch (err) {
-        console.error('[Translation] Failed to scan channel:', err.message);
-    }
-}
 
 function extractEmbedText(embed) {
     const parts = [];
