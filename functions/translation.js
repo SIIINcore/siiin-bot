@@ -4,335 +4,295 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    EmbedBuilder,
-    StringSelectMenuBuilder
+    StringSelectMenuBuilder,
+    EmbedBuilder
 } = require('discord.js');
-
 const {
-    STAFF_IDS,
     TRANSLATION_CHANNEL_IDS,
+    STAFF_IDS,
     TRANSLATION_DAILY_LIMIT,
-    BOT_ID,
-    TRANSLATION_MIN_LENGTH
+    TRANSLATION_MIN_LENGTH,
+    OPENAI_TRANSLATE_MODEL,
+    BOT_ID
 } = require('../config/constants');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, '../data');
 const USAGE_FILE = path.join(DATA_DIR, 'translation-usage.json');
-const HELPER_EMOJI = '🌐';
-const HELPER_MARKER = 'SIIIN Translation Helper';
+
 const LANGUAGE_OPTIONS = [
-    { label: 'Français', value: 'French', description: 'Translate to French', emoji: '🇫🇷' },
-    { label: 'English', value: 'English', description: 'Translate to English', emoji: '🇬🇧' },
-    { label: 'Español', value: 'Spanish', description: 'Translate to Spanish', emoji: '🇪🇸' },
-    { label: 'Italiano', value: 'Italian', description: 'Translate to Italian', emoji: '🇮🇹' },
-    { label: 'Deutsch', value: 'German', description: 'Translate to German', emoji: '🇩🇪' },
-    { label: 'Українська', value: 'Ukrainian', description: 'Translate to Ukrainian', emoji: '🇺🇦' },
-    { label: '中文（简体）', value: 'Simplified Chinese', description: 'Translate to Simplified Chinese', emoji: '🇨🇳' },
-    { label: '日本語', value: 'Japanese', description: 'Translate to Japanese', emoji: '🇯🇵' },
-    { label: 'Русский', value: 'Russian', description: 'Translate to Russian', emoji: '🇷🇺' }
+    { label: 'Français', value: 'French', emoji: '🇫🇷' },
+    { label: 'English', value: 'English', emoji: '🇬🇧' },
+    { label: 'Español', value: 'Spanish', emoji: '🇪🇸' },
+    { label: 'Italiano', value: 'Italian', emoji: '🇮🇹' },
+    { label: 'Deutsch', value: 'German', emoji: '🇩🇪' },
+    { label: 'Українська', value: 'Ukrainian', emoji: '🇺🇦' },
+    { label: '中文（简体）', value: 'Simplified Chinese', emoji: '🇨🇳' },
+    { label: '日本語', value: 'Japanese', emoji: '🇯🇵' },
+    { label: 'Русский', value: 'Russian', emoji: '🇷🇺' }
 ];
 
 function ensureUsageFile() {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     if (!fs.existsSync(USAGE_FILE)) {
-        fs.writeFileSync(USAGE_FILE, JSON.stringify({}, null, 2), 'utf8');
+        fs.writeFileSync(USAGE_FILE, '{}', 'utf8');
     }
 }
 
-function loadUsage() {
+function readUsage() {
+    ensureUsageFile();
     try {
-        ensureUsageFile();
-        return JSON.parse(fs.readFileSync(USAGE_FILE, 'utf8'));
-    } catch (err) {
-        console.error('[Translation] Failed to load usage:', err.message);
+        return JSON.parse(fs.readFileSync(USAGE_FILE, 'utf8')) || {};
+    } catch {
         return {};
     }
 }
 
-function saveUsage(payload) {
-    try {
-        ensureUsageFile();
-        fs.writeFileSync(USAGE_FILE, JSON.stringify(payload, null, 2), 'utf8');
-    } catch (err) {
-        console.error('[Translation] Failed to save usage:', err.message);
-    }
+function writeUsage(data) {
+    ensureUsageFile();
+    fs.writeFileSync(USAGE_FILE, JSON.stringify(data, null, 2), 'utf8');
 }
 
-function todayKey() {
+function getTodayKey() {
     return new Date().toISOString().slice(0, 10);
 }
 
-function pruneUsage(payload) {
-    const keys = Object.keys(payload).sort();
-    while (keys.length > 7) {
-        const oldest = keys.shift();
-        delete payload[oldest];
-    }
-    return payload;
+function getUserUsage(userId) {
+    const data = readUsage();
+    const todayKey = getTodayKey();
+    return Number(data[todayKey]?.[userId] || 0);
 }
 
-function consumeTranslationQuota(userId) {
-    const payload = pruneUsage(loadUsage());
-    const day = todayKey();
-    payload[day] = payload[day] || {};
-    const current = Number(payload[day][userId] || 0);
-
-    if (current >= TRANSLATION_DAILY_LIMIT) {
-        return { allowed: false, remaining: 0, used: current };
-    }
-
-    payload[day][userId] = current + 1;
-    saveUsage(payload);
-    return {
-        allowed: true,
-        remaining: Math.max(0, TRANSLATION_DAILY_LIMIT - (current + 1)),
-        used: current + 1
-    };
+function incrementUserUsage(userId) {
+    const data = readUsage();
+    const todayKey = getTodayKey();
+    if (!data[todayKey]) data[todayKey] = {};
+    data[todayKey][userId] = Number(data[todayKey][userId] || 0) + 1;
+    writeUsage(data);
+    return data[todayKey][userId];
 }
 
-function isTranslationChannel(channelId) {
+function isEligibleChannel(channelId) {
     return TRANSLATION_CHANNEL_IDS.includes(channelId);
 }
 
-function getMessageSourceTextLength(message) {
-    const text = extractMessageText(message);
-    return text.trim().length;
+function isEligibleAuthor(message, client) {
+    return message.author.id === client.user.id || message.author.id === BOT_ID || STAFF_IDS.includes(message.author.id);
 }
 
-function isEligibleSourceMessage(message, client) {
-    if (!message || !message.guild) return false;
-    if (!isTranslationChannel(message.channelId)) return false;
-    if (getMessageSourceTextLength(message) <= TRANSLATION_MIN_LENGTH) return false;
-    if (message.author.id === client.user.id) {
-        if (message.components?.length) return false;
-        if (message.embeds?.some(embed => embed.footer?.text === HELPER_MARKER)) return false;
-        return true;
+function extractTranslatableText(message) {
+    const parts = [];
+    if (message.content?.trim()) parts.push(message.content.trim());
+
+    for (const embed of message.embeds || []) {
+        if (embed.title) parts.push(embed.title.trim());
+        if (embed.description) parts.push(embed.description.trim());
+        if (Array.isArray(embed.fields)) {
+            for (const field of embed.fields) {
+                if (field.name) parts.push(String(field.name).trim());
+                if (field.value) parts.push(String(field.value).trim());
+            }
+        }
+        if (embed.footer?.text) parts.push(String(embed.footer.text).trim());
+        if (embed.author?.name) parts.push(String(embed.author.name).trim());
     }
-    return STAFF_IDS.includes(message.author.id);
+
+    return parts.filter(Boolean).join('\n\n').trim();
 }
 
-function buildTranslateComponents(targetMessageId) {
-    const button = new ButtonBuilder()
-        .setCustomId(`translate_open:${targetMessageId}`)
-        .setLabel('Translate this message')
-        .setEmoji(HELPER_EMOJI)
-        .setStyle(ButtonStyle.Secondary);
+function shouldOfferTranslation(message, client) {
+    if (!message.guild || !isEligibleChannel(message.channel.id)) return false;
+    if (!isEligibleAuthor(message, client)) return false;
+    if (message.reference?.messageId) return false;
+    if (message.type !== 0) return false;
 
-    return [new ActionRowBuilder().addComponents(button)];
+    const text = extractTranslatableText(message);
+    return text.length > TRANSLATION_MIN_LENGTH;
 }
 
-async function sendTranslationHelper(message) {
-    const embed = new EmbedBuilder()
-        .setColor(0x66C2FF)
-        .setDescription(`${HELPER_EMOJI} **Need a translation?** Use the button below to open a private language menu for this message.`)
-        .setFooter({ text: HELPER_MARKER });
+function buildHelperRow(message) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`translate_open:${message.channel.id}:${message.id}`)
+            .setLabel('Translate')
+            .setEmoji('🌐')
+            .setStyle(ButtonStyle.Secondary)
+    );
+}
 
-    await message.channel.send({
-        embeds: [embed],
-        components: buildTranslateComponents(message.id),
-        reply: { messageReference: message.id, failIfNotExists: false },
-        allowedMentions: { repliedUser: false }
+async function attachTranslationHelper(message) {
+    try {
+        await message.reply({
+            content: 'Need a translation? Click below.',
+            components: [buildHelperRow(message)],
+            allowedMentions: { repliedUser: false }
+        });
+    } catch (error) {
+        console.error('[Translation] Helper attach error:', error.message);
+    }
+}
+
+function buildLanguageMenu(channelId, messageId) {
+    return new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId(`translate_select:${channelId}:${messageId}`)
+            .setPlaceholder('Choose a language')
+            .addOptions(LANGUAGE_OPTIONS.map(option => ({
+                label: option.label,
+                value: option.value,
+                emoji: option.emoji
+            })))
+    );
+}
+
+async function handleTranslateOpen(interaction) {
+    const [, channelId, messageId] = interaction.customId.split(':');
+
+    return interaction.reply({
+        embeds: [
+            new EmbedBuilder()
+                .setTitle('🌐 Message translation')
+                .setColor(0x66C2FF)
+                .setDescription('Choose a language below. The translated message will only be visible to you.')
+                .setFooter({ text: `Daily limit: ${TRANSLATION_DAILY_LIMIT} translations` })
+        ],
+        components: [buildLanguageMenu(channelId, messageId)],
+        ephemeral: true
     });
 }
 
-async function ensureTranslationHelperForMessage(message, client) {
-    try {
-        if (!isEligibleSourceMessage(message, client)) return;
-
-        const recent = await message.channel.messages.fetch({ limit: 25 }).catch(() => null);
-        if (recent) {
-            const hasHelper = recent.some(msg =>
-                msg.author.id === client.user.id &&
-                msg.reference?.messageId === message.id &&
-                msg.components?.some(row => row.components?.some(component => component.customId === `translate_open:${message.id}`))
-            );
-            if (hasHelper) return;
-        }
-
-        await sendTranslationHelper(message);
-    } catch (err) {
-        console.error('[Translation] Failed to ensure helper:', err.message);
-    }
-}
-
-
-function extractEmbedText(embed) {
-    const parts = [];
-    if (embed.title) parts.push(`Title: ${embed.title}`);
-    if (embed.description) parts.push(embed.description);
-    if (Array.isArray(embed.fields)) {
-        for (const field of embed.fields) {
-            parts.push(`${field.name}: ${field.value}`);
-        }
-    }
-    if (embed.footer?.text) parts.push(`Footer: ${embed.footer.text}`);
-    return parts.join('\n');
-}
-
-function extractMessageText(message) {
-    const parts = [];
-    if (message.content?.trim()) parts.push(message.content.trim());
-    for (const embed of message.embeds || []) {
-        const text = extractEmbedText(embed);
-        if (text.trim()) parts.push(text.trim());
-    }
-    return parts.join('\n\n').trim();
-}
-
-function truncateForApi(text, maxLength = 3500) {
-    if (text.length <= maxLength) return text;
-    return `${text.slice(0, maxLength - 24)}\n\n[Content truncated for translation]`;
-}
-
-async function fetchTargetMessage(interaction, messageId) {
-    try {
-        return await interaction.channel.messages.fetch(messageId);
-    } catch {
-        return null;
-    }
-}
-
-function buildLanguageMenu(targetMessageId) {
-    const menu = new StringSelectMenuBuilder()
-        .setCustomId(`translate_lang:${targetMessageId}`)
-        .setPlaceholder('Choose a language')
-        .addOptions(LANGUAGE_OPTIONS);
-
-    return [new ActionRowBuilder().addComponents(menu)];
-}
-
-async function handleTranslateOpen(interaction, targetMessageId) {
-    const targetMessage = await fetchTargetMessage(interaction, targetMessageId);
-    if (!targetMessage) {
-        return interaction.reply({ content: '❌ I could not find the original message anymore.', ephemeral: true });
-    }
-
-    const embed = new EmbedBuilder()
-        .setColor(0x66C2FF)
-        .setTitle('🌐 Translation menu')
-        .setDescription('Choose a language below. The translation will only be visible to you.')
-        .addFields({ name: 'Message', value: `[Open original message](${targetMessage.url})` });
-
-    if (interaction.replied || interaction.deferred) {
-        return interaction.followUp({ embeds: [embed], components: buildLanguageMenu(targetMessageId), ephemeral: true });
-    }
-
-    return interaction.reply({ embeds: [embed], components: buildLanguageMenu(targetMessageId), ephemeral: true });
-}
-
-async function requestOpenAITranslation(text, language) {
+async function requestTranslation(text, targetLanguage) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
         throw new Error('OPENAI_API_KEY is missing.');
     }
 
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`
+            'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: process.env.OPENAI_TRANSLATE_MODEL || 'gpt-4o-mini',
-            input: [
+            model: OPENAI_TRANSLATE_MODEL,
+            temperature: 0.2,
+            messages: [
                 {
                     role: 'system',
-                    content: [
-                        {
-                            type: 'input_text',
-                            text: 'You translate Discord messages accurately. Keep mentions, channel links, URLs, emojis, markdown, line breaks, and formatting intact whenever possible. Do not add explanations. Return only the translation in the target language.'
-                        }
-                    ]
+                    content: 'You are a translation assistant for a Discord bot. Translate the provided message accurately into the target language. Keep formatting, line breaks, links, emoji, and tone. Do not add notes or commentary. Output only the translation.'
                 },
                 {
                     role: 'user',
-                    content: [
-                        {
-                            type: 'input_text',
-                            text: `Target language: ${language}\n\nTranslate this message:\n\n${truncateForApi(text)}`
-                        }
-                    ]
+                    content: `Target language: ${targetLanguage}\n\nMessage to translate:\n${text}`
                 }
-            ],
-            max_output_tokens: 1200
+            ]
         })
     });
 
+    const data = await response.json();
     if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown API error');
-        throw new Error(`OpenAI API error ${response.status}: ${errorText}`);
+        throw new Error(data?.error?.message || `OpenAI request failed with status ${response.status}`);
     }
 
-    const data = await response.json();
-    const textOutput = data.output_text || '';
-    if (!textOutput.trim()) {
-        throw new Error('Empty translation response.');
-    }
-    return textOutput.trim();
+    return data?.choices?.[0]?.message?.content?.trim() || null;
 }
 
-async function handleTranslateLanguage(interaction, targetMessageId) {
-    const language = interaction.values?.[0];
-    const targetMessage = await fetchTargetMessage(interaction, targetMessageId);
+async function handleTranslateSelect(interaction) {
+    const [, channelId, messageId] = interaction.customId.split(':');
+    const targetLanguage = interaction.values?.[0];
 
-    if (!language) {
-        return interaction.update({ content: '❌ No language selected.', embeds: [], components: [] });
-    }
-
-    if (!targetMessage) {
-        return interaction.update({ content: '❌ I could not find the original message anymore.', embeds: [], components: [] });
-    }
-
-    const originalText = extractMessageText(targetMessage);
-    if (!originalText) {
-        return interaction.update({ content: '❌ This message has no translatable text.', embeds: [], components: [] });
-    }
-
-    const quota = consumeTranslationQuota(interaction.user.id);
-    if (!quota.allowed) {
+    if (!targetLanguage) {
         return interaction.update({
-            content: `❌ You have reached your daily translation limit (${TRANSLATION_DAILY_LIMIT}/${TRANSLATION_DAILY_LIMIT}). Please try again tomorrow.`,
+            content: '❌ No language selected.',
+            components: [],
             embeds: [],
-            components: []
+            ephemeral: true
         });
     }
 
-    await interaction.update({ content: '⏳ Translating your message...', embeds: [], components: [] });
+    const usedToday = getUserUsage(interaction.user.id);
+    if (usedToday >= TRANSLATION_DAILY_LIMIT) {
+        return interaction.update({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle('🌐 Daily limit reached')
+                    .setColor(0xFFAA00)
+                    .setDescription('You have reached your daily translation limit. Please try again tomorrow.')
+                    .setFooter({ text: `Limit: ${TRANSLATION_DAILY_LIMIT} per day` })
+            ],
+            components: [],
+            ephemeral: true
+        });
+    }
+
+    await interaction.update({
+        embeds: [
+            new EmbedBuilder()
+                .setTitle('🌐 Translating...')
+                .setColor(0x66C2FF)
+                .setDescription(`Please wait while I translate this message to ${targetLanguage}.`)
+        ],
+        components: [],
+        ephemeral: true
+    });
 
     try {
-        const translatedText = await requestOpenAITranslation(originalText, language);
-        const resultEmbed = new EmbedBuilder()
-            .setColor(0x66C2FF)
-            .setTitle(`🌐 Translation • ${language}`)
-            .setDescription(translatedText.slice(0, 4096))
-            .addFields(
-                { name: 'Original message', value: `[Open original message](${targetMessage.url})`, inline: false },
-                { name: 'Daily usage', value: `${quota.used}/${TRANSLATION_DAILY_LIMIT} used`, inline: true },
-                { name: 'Remaining today', value: `${quota.remaining}`, inline: true }
-            )
-            .setFooter({ text: `Requested by ${interaction.user.username}` })
-            .setTimestamp();
+        const channel = await interaction.client.channels.fetch(channelId).catch(() => null);
+        if (!channel?.isTextBased()) throw new Error('Source channel not found.');
 
-        await interaction.followUp({ embeds: [resultEmbed], ephemeral: true });
-    } catch (err) {
-        console.error('[Translation] API error:', err.message);
-        await interaction.followUp({
-            content: '❌ Translation failed. Please try again later.',
+        const sourceMessage = await channel.messages.fetch(messageId).catch(() => null);
+        if (!sourceMessage) throw new Error('Source message not found.');
+
+        const sourceText = extractTranslatableText(sourceMessage);
+        if (!sourceText || sourceText.length <= TRANSLATION_MIN_LENGTH) {
+            throw new Error('This message is too short to translate.');
+        }
+
+        const translatedText = await requestTranslation(sourceText, targetLanguage);
+        if (!translatedText) throw new Error('Empty translation received.');
+
+        incrementUserUsage(interaction.user.id);
+
+        const originalUrl = sourceMessage.url;
+        const authorName = sourceMessage.member?.displayName || sourceMessage.author.globalName || sourceMessage.author.username;
+
+        return interaction.followUp({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle(`🌐 Translation • ${targetLanguage}`)
+                    .setColor(0x66C2FF)
+                    .setDescription(translatedText.slice(0, 4096))
+                    .addFields(
+                        { name: 'Original author', value: authorName || sourceMessage.author.tag, inline: true },
+                        { name: 'Used today', value: `${getUserUsage(interaction.user.id)}/${TRANSLATION_DAILY_LIMIT}`, inline: true },
+                        { name: 'Source message', value: `[Jump to message](${originalUrl})`, inline: false }
+                    )
+                    .setFooter({ text: `Model: ${OPENAI_TRANSLATE_MODEL}` })
+                    .setTimestamp()
+            ],
+            ephemeral: true
+        });
+    } catch (error) {
+        console.error('[Translation] Translate error:', error.message);
+        return interaction.followUp({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle('❌ Translation error')
+                    .setColor(0xFF4D4D)
+                    .setDescription(error.message || 'An unexpected error occurred while translating this message.')
+            ],
             ephemeral: true
         });
     }
 }
 
-async function handleTranslationInteraction(interaction, client) {
+async function handleTranslationInteraction(interaction) {
     if (interaction.isButton() && interaction.customId.startsWith('translate_open:')) {
-        const [, messageId] = interaction.customId.split(':');
-        await handleTranslateOpen(interaction, messageId);
+        await handleTranslateOpen(interaction);
         return true;
     }
 
-    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('translate_lang:')) {
-        const [, messageId] = interaction.customId.split(':');
-        await handleTranslateLanguage(interaction, messageId);
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('translate_select:')) {
+        await handleTranslateSelect(interaction);
         return true;
     }
 
@@ -340,8 +300,8 @@ async function handleTranslationInteraction(interaction, client) {
 }
 
 module.exports = {
-    ensureTranslationHelperForMessage,
-    ensureHelpersForChannel,
+    shouldOfferTranslation,
+    attachTranslationHelper,
     handleTranslationInteraction,
-    isTranslationChannel
+    extractTranslatableText
 };
