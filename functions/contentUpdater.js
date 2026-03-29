@@ -77,7 +77,7 @@ function saveState() {
 
 
 function faviconForDomain(domain) {
-    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+    return `https://www.google.com/s2/favicons?sz=256&domain_url=${encodeURIComponent(`https://${domain}`)}`;
 }
 
 function getBrandMeta(label = '', platform = '') {
@@ -86,10 +86,10 @@ function getBrandMeta(label = '', platform = '') {
     const brands = [
         { match: ['steam', 'cs steam'], name: 'Steam', icon: faviconForDomain('store.steampowered.com') },
         { match: ['epic games', 'cs epicgames', 'cs epic'], name: 'Epic Games', icon: faviconForDomain('store.epicgames.com') },
-        { match: ['gog', 'cs gog'], name: 'GOG', icon: faviconForDomain('gog.com') },
-        { match: ['ea', 'cs ea'], name: 'EA', icon: faviconForDomain('ea.com') },
-        { match: ['ubisoft', 'cs ubisoft'], name: 'Ubisoft', icon: faviconForDomain('ubisoft.com') },
-        { match: ['apple', 'apple rss'], name: 'Apple', icon: faviconForDomain('apple.com') },
+        { match: ['gog', 'cs gog'], name: 'GOG', icon: faviconForDomain('www.gog.com') },
+        { match: ['ea', 'cs ea'], name: 'EA', icon: faviconForDomain('www.ea.com') },
+        { match: ['ubisoft', 'cs ubisoft'], name: 'Ubisoft', icon: faviconForDomain('store.ubisoft.com') },
+        { match: ['apple', 'apple rss'], name: 'Apple', icon: faviconForDomain('www.apple.com') },
         { match: ['android'], name: 'Android', icon: faviconForDomain('play.google.com') }
     ];
 
@@ -133,8 +133,8 @@ async function postFreeGames(channel) {
                 .setAuthor({ name: brand.name, iconURL: brand.icon, url: game.url })
                 .setTimestamp();
 
-            if (game.image) embed.setImage(game.image);
             embed.setThumbnail(brand.icon);
+            if (game.image) embed.setImage(game.image);
 
             if (isFreeWeekend) {
                 embed
@@ -249,8 +249,8 @@ async function postFreeToPlayGames(channel) {
                 .setFooter({ text: 'Free-to-Play • Always available' })
                 .setTimestamp();
 
-            if (game.image) embed.setImage(game.image);
             embed.setThumbnail(brand.icon);
+            if (game.image) embed.setImage(game.image);
 
             const fields = [
                 { name: 'Platform', value: game.platform, inline: true },
@@ -298,16 +298,16 @@ async function postMobileApps(channel) {
                 .setDescription(truncateText(app.description || 'Top free mobile app.', 240))
                 .setColor(color)
                 .setAuthor({ name: brand.name, iconURL: brand.icon, url: app.sourceUrl || app.url })
-.addFields(
+                .addFields(
                     { name: 'Platform', value: app.sourceLabel || app.platform, inline: true },
                     { name: 'Rank', value: `#${app.rank}`, inline: true },
                     { name: 'Developer', value: truncateText(app.developer || 'Unknown developer', 100), inline: true },
-                    { name: 'Source', value: app.sourceUrl ? `[Open source](${app.sourceUrl})` : (app.footerSource || 'Source'), inline: false }
+                    { name: app.genericLink ? 'Open ranking' : 'Source', value: app.sourceUrl ? `[Open source](${app.sourceUrl})` : (app.footerSource || 'Source'), inline: false }
                 )
                 .setFooter({ text: `${app.footerSource || 'Source'} • Top Free` })
                 .setTimestamp();
 
-            if (app.image) embed.setThumbnail(app.image);
+            embed.setThumbnail(app.image || brand.icon);
 
             await channel.send({ embeds: [embed] });
             postedMobile.add(app.id);
