@@ -104,7 +104,7 @@ async function sendBanLog(client, userId, reason) {
     try {
         const banLogChannel = await client.channels.fetch(BAN_LOG_CHANNEL_ID).catch(() => null);
         if (!banLogChannel || !banLogChannel.isTextBased()) return;
-        await banLogChannel.send(`<@${userId}> \`${reason || 'No reason provided'}\``);
+        await banLogChannel.send(`<@${userId}>\`${reason || 'No reason provided'}\``);
     } catch (err) {
         console.error('[Automod] Failed to send ban log:', err.message);
     }
