@@ -5,7 +5,7 @@ async function sendSimpleBanLog(guild, userId, reason) {
     try {
         const banLogChannel = await guild.channels.fetch(BAN_LOG_CHANNEL_ID).catch(() => null);
         if (!banLogChannel || !banLogChannel.isTextBased()) return;
-        await banLogChannel.send(`<@${userId}> \`${reason || 'No reason provided'}\``);
+        await banLogChannel.send(`<@${userId}>\`${reason || 'No reason provided'}\``);
     } catch (err) {
         console.error('[AuditLog] Failed to send simple ban log:', err.message);
     }
