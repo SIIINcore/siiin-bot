@@ -1,4 +1,3 @@
-// config/constants.js
 module.exports = {
     // ========================
     // CHANNELS ID
@@ -6,6 +5,8 @@ module.exports = {
     CHANNEL_FREEGAMES: '1469855556356542649',
     CHANNEL_PROMOS: '1469855518695624725',
     CHANNEL_FREETOPLAY: '1468126872297672928',
+    CHANNEL_MOBILE: '1487769618733858956',
+    SEARCH_CHANNEL_ID: '1376910830490095798',
     CHANNEL_WELCOME: '1033462383798140981',
     STATS_CHANNEL_ID: '1465938751208558643',
     SUPPORT_CHANNEL_ID: '1468090646442279206',
@@ -57,7 +58,10 @@ module.exports = {
             'steamcommunity.com',
             'gog.com',
             'epicgames.com',
-            'cheapshark.com'
+            'cheapshark.com',
+            'appbrain.com',
+            'apps.apple.com',
+            'rss.marketingtools.apple.com'
         ]
     },
 
