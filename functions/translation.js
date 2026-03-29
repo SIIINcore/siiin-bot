@@ -9,11 +9,9 @@ const {
 } = require('discord.js');
 const {
     TRANSLATION_CHANNEL_IDS,
-    STAFF_IDS,
     TRANSLATION_DAILY_LIMIT,
     TRANSLATION_MIN_LENGTH,
-    OPENAI_TRANSLATE_MODEL,
-    BOT_ID
+    OPENAI_TRANSLATE_MODEL
 } = require('../config/constants');
 
 const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, '../data');
@@ -76,7 +74,7 @@ function isEligibleChannel(channelId) {
 }
 
 function isEligibleAuthor(message, client) {
-    return message.author.id === client.user.id || message.author.id === BOT_ID || STAFF_IDS.includes(message.author.id);
+    return !!message.author && !message.author.system;
 }
 
 function extractTranslatableText(message) {
@@ -99,13 +97,41 @@ function extractTranslatableText(message) {
     return parts.filter(Boolean).join('\n\n').trim();
 }
 
+function isImageOnlyMessage(message) {
+    const hasTextContent = Boolean(message.content?.trim());
+    const hasEmbeds = Array.isArray(message.embeds) && message.embeds.length > 0;
+    const attachments = Array.from(message.attachments?.values?.() || []);
+    const hasAttachments = attachments.length > 0;
+
+    if (hasTextContent) return false;
+    if (hasEmbeds) return true;
+    if (!hasAttachments) return false;
+
+    return attachments.every(att => {
+        const contentType = String(att.contentType || '').toLowerCase();
+        return contentType.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(att.name || '');
+    });
+}
+
+function hasOnlyLinks(text) {
+    if (!text) return false;
+    const normalized = text.trim();
+    if (!normalized) return false;
+    const parts = normalized.split(/\s+/).filter(Boolean);
+    if (!parts.length) return false;
+    return parts.every(part => /^(https?:\/\/|www\.)\S+$/i.test(part));
+}
+
 function shouldOfferTranslation(message, client) {
     if (!message.guild || !isEligibleChannel(message.channel.id)) return false;
     if (!isEligibleAuthor(message, client)) return false;
     if (message.reference?.messageId) return false;
     if (message.type !== 0) return false;
+    if (isImageOnlyMessage(message)) return false;
 
     const text = extractTranslatableText(message);
+    if (!text || hasOnlyLinks(text)) return false;
+
     return text.length > TRANSLATION_MIN_LENGTH;
 }
 
