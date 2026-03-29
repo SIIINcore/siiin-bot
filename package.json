@@ -1,6 +1,6 @@
 {
   "name": "siiin-bot",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "SIIIN Core Discord Bot with automod, free games, promotions and ticket system",
   "main": "index.js",
   "scripts": {
