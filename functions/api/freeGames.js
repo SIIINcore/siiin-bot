@@ -53,9 +53,10 @@ async function fetchEpicFreeGames() {
             url: game.open_giveaway_url,
             image: game.image,
             description: truncateText(game.description || '', 500),
-            platform: game.platforms,
+            platform: 'Epic Games',
             type: 'free',
             store: 'epic',
+            sourceLabel: 'Epic Games',
             worth: game.worth && game.worth !== 'N/A' ? `Value: ${game.worth}` : '',
             endDate: game.end_date && game.end_date !== 'N/A'
                 ? `Until: ${new Date(game.end_date).toLocaleDateString('en-US')}`
@@ -91,6 +92,7 @@ async function fetchSteamFreeGames() {
                 platform: 'Steam',
                 type: isFreeWeekend ? 'free_weekend' : 'free',
                 store: 'steam',
+                sourceLabel: 'Steam',
                 originalPrice: originalPrice > 0 ? `$${(originalPrice / 100).toFixed(2)}` : 'Free-to-Play',
                 discountPercent: isFreeWeekend ? 100 : 0
             });
@@ -98,6 +100,55 @@ async function fetchSteamFreeGames() {
     }
 
     return freeGames.slice(0, 10);
+}
+
+function buildCheapSharkStoreSearchUrl(storeKey, title) {
+    const query = encodeURIComponent(title || '');
+
+    if (storeKey === 'cs-gog') return `https://www.gog.com/en/games?query=${query}`;
+    return `https://www.cheapshark.com/redirect?dealID=`;
+}
+
+async function fetchCheapSharkFreeGames(storeId, storeKey) {
+    const data = await safeFetchJson(
+        `${API_CONFIG.CHEAP_SHARK.BASE_URL}/deals?storeID=${storeId}&upperPrice=0&pageSize=20`,
+        10000
+    );
+
+    if (!Array.isArray(data)) return [];
+
+    return data
+        .filter(game => {
+            const normalPrice = parseFloat(game.normalPrice || '0');
+            const salePrice = parseFloat(game.salePrice || '0');
+            return Number.isFinite(normalPrice) && Number.isFinite(salePrice) && normalPrice > 0 && salePrice === 0;
+        })
+        .map(game => {
+            const title = game.title || 'Unknown title';
+            const url = storeKey === 'cs-gog'
+                ? `https://www.gog.com/en/games?query=${encodeURIComponent(title)}`
+                : `https://www.cheapshark.com/redirect?dealID=${game.dealID}`;
+
+            return {
+                id: `${storeKey}_${game.dealID}`,
+                title,
+                url,
+                image: game.thumb,
+                description: 'Temporarily free game detected by CheapShark.',
+                platform: storeKey === 'cs-ea' ? 'EA' : storeKey === 'cs-ubisoft' ? 'Ubisoft' : storeKey === 'cs-gog' ? 'GOG' : 'Store',
+                type: 'free',
+                store: storeKey,
+                sourceLabel: {
+                    'cs-gog': 'CS GOG',
+                    'cs-ea': 'CS EA',
+                    'cs-ubisoft': 'CS Ubisoft',
+                    'cs-steam': 'CS Steam',
+                    'cs-epic': 'CS EpicGames'
+                }[storeKey] || 'CheapShark',
+                originalPrice: `$${parseFloat(game.normalPrice || '0').toFixed(2)}`,
+                worth: game.savings ? `Value: $${parseFloat(game.savings).toFixed(2)} saved` : ''
+            };
+        });
 }
 
 async function fetchFreeToPlayGames() {
@@ -163,24 +214,21 @@ async function fetchAllFreeGames() {
     const seenHashes = new Set();
 
     try {
-        console.log('📥 Fetching Epic Games...');
-        const epicGames = await fetchEpicFreeGames();
-        for (const game of epicGames) {
-            const hash = generateGameHash(game.title, '0', 'epic');
-            if (seenHashes.has(hash)) continue;
-            seenHashes.add(hash);
-            allGames.push(game);
-        }
+        const batches = await Promise.all([
+            fetchEpicFreeGames(),
+            fetchSteamFreeGames(),
+            fetchCheapSharkFreeGames(API_CONFIG.CHEAP_SHARK.STORES.GOG, 'cs-gog'),
+            fetchCheapSharkFreeGames(API_CONFIG.CHEAP_SHARK.STORES.EA, 'cs-ea'),
+            fetchCheapSharkFreeGames(API_CONFIG.CHEAP_SHARK.STORES.UBISOFT, 'cs-ubisoft')
+        ]);
 
-        await delay(1000);
-
-        console.log('📥 Fetching Steam...');
-        const steamGames = await fetchSteamFreeGames();
-        for (const game of steamGames) {
-            const hash = generateGameHash(game.title, '0', 'steam');
-            if (seenHashes.has(hash)) continue;
-            seenHashes.add(hash);
-            allGames.push(game);
+        for (const games of batches) {
+            for (const game of games) {
+                const hash = generateGameHash(game.title, '0', game.store);
+                if (seenHashes.has(hash)) continue;
+                seenHashes.add(hash);
+                allGames.push(game);
+            }
         }
     } catch (err) {
         console.error('[AllFreeGames] Global error:', err.message);
@@ -193,6 +241,7 @@ async function fetchAllFreeGames() {
 module.exports = {
     fetchEpicFreeGames,
     fetchSteamFreeGames,
+    fetchCheapSharkFreeGames,
     fetchFreeToPlayGames,
     fetchAllFreeGames
 };
