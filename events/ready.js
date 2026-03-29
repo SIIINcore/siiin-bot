@@ -1,6 +1,7 @@
 const { updateAll, softRestart, postedGames, postedPromos, postedFreeToPlay, postedMobile } = require('../functions/contentUpdater');
 const { sendTicketEmbed } = require('../functions/tickets');
 const { EmbedBuilder } = require('discord.js');
+const { ensureTranslationHelperForMessage } = require('../functions/translation');
 const {
     LOG_CHANNEL_ID,
     CHAT_CHANNEL_ID,
@@ -61,7 +62,8 @@ async function updateStatsEmbed(guild, client, freeGamesSet, promosSet, freeToPl
         if (botMessages.size > 0) {
             await botMessages.first().edit({ embeds: [embed] });
         } else {
-            await channel.send({ embeds: [embed] });
+            const sentMessage = await channel.send({ embeds: [embed] });
+        await ensureTranslationHelperForMessage(sentMessage, client);
         }
     } catch (err) {
         console.error('[Stats] Error:', err.message);
@@ -97,7 +99,8 @@ Your donations help us maintain and improve the server, as well as cover hosting
             .setFooter({ text: 'SIIIN Development Team • Thank you for your support!' })
             .setTimestamp();
 
-        await channel.send({ embeds: [embed] });
+        const sentMessage = await channel.send({ embeds: [embed] });
+        await ensureTranslationHelperForMessage(sentMessage, client);
     } catch (err) {
         console.error('[DonationMessage] Error:', err.message);
     }
@@ -122,7 +125,8 @@ async function sendSearchLinksMessage(client) {
             .setFooter({ text: 'SIIIN Search • Refreshed on every bot reboot' })
             .setTimestamp();
 
-        await channel.send({ embeds: [embed] });
+        const sentMessage = await channel.send({ embeds: [embed] });
+        await ensureTranslationHelperForMessage(sentMessage, client);
     } catch (err) {
         console.error('[SearchLinks] Error:', err.message);
     }
@@ -154,7 +158,8 @@ Please respect the rules for the happiness of Discord users.`
             .setColor(0x5865F2)
             .setFooter({ text: 'SIIIN Community • Be respectful' });
 
-        await channel.send({ embeds: [embed] });
+        const sentMessage = await channel.send({ embeds: [embed] });
+        await ensureTranslationHelperForMessage(sentMessage, client);
     } catch (err) {
         console.error('[ChatReminder] Error:', err.message);
     }
