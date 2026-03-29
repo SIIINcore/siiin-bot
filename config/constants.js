@@ -77,6 +77,7 @@ module.exports = {
         '1189391329097166989'
     ],
     TRANSLATION_DAILY_LIMIT: Number(process.env.TRANSLATION_DAILY_LIMIT || 3),
+    TRANSLATION_MIN_LENGTH: Number(process.env.TRANSLATION_MIN_LENGTH || 25),
 
     // ========================
     // TICKETS RULES
