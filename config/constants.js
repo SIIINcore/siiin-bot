@@ -65,6 +65,19 @@ module.exports = {
         ]
     },
 
+
+
+    // ========================
+    // TRANSLATION
+    // ========================
+    TRANSLATION_CHANNEL_IDS: [
+        '1237650687249092670',
+        '1177257234787471422',
+        '1178517213444046948',
+        '1189391329097166989'
+    ],
+    TRANSLATION_DAILY_LIMIT: Number(process.env.TRANSLATION_DAILY_LIMIT || 3),
+
     // ========================
     // TICKETS RULES
     // ========================
