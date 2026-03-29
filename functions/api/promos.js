@@ -64,6 +64,7 @@ async function fetchSteamPromos() {
                 discountPercent,
                 type: 'promo',
                 store: 'steam',
+                sourceLabel: 'Steam',
                 description: truncateText(game.detailed_description || '', 300)
             };
         })
@@ -90,17 +91,30 @@ async function fetchCheapSharkStorePromos(storeId, storeName) {
             const normalPrice = parseFloat(game.normalPrice);
             const salePrice = parseFloat(game.salePrice);
             const discountPercent = Math.round(((normalPrice - salePrice) / normalPrice) * 100);
+            const title = game.title || 'Unknown title';
+            const storeLabels = {
+                'cheapshark-steam': 'CS Steam',
+                'cs-gog': 'CS GOG',
+                'cs-epic': 'CS EpicGames',
+                'cs-ea': 'CS EA',
+                'cs-ubisoft': 'CS Ubisoft'
+            };
+
+            const url = storeName === 'cs-gog'
+                ? `https://www.gog.com/en/games?query=${encodeURIComponent(title)}`
+                : `https://www.cheapshark.com/redirect?dealID=${game.dealID}`;
 
             return {
                 id: `${storeName}_${game.dealID}`,
-                title: game.title,
-                url: `https://www.cheapshark.com/redirect?dealID=${game.dealID}`,
+                title,
+                url,
                 image: game.thumb,
                 price: salePrice.toFixed(2),
                 normalPrice: normalPrice.toFixed(2),
                 discountPercent,
                 type: 'promo',
                 store: storeName,
+                sourceLabel: storeLabels[storeName] || 'CheapShark',
                 steamRating: game.steamRatingText || 'N/A',
                 description: 'Limited time promotion.'
             };
@@ -123,8 +137,10 @@ async function fetchAllPromos() {
         const batches = await Promise.all([
             fetchSteamPromos(),
             fetchCheapSharkStorePromos(API_CONFIG.CHEAP_SHARK.STORES.STEAM, 'cheapshark-steam'),
-            fetchCheapSharkStorePromos(API_CONFIG.CHEAP_SHARK.STORES.GOG, 'gog'),
-            fetchCheapSharkStorePromos(API_CONFIG.CHEAP_SHARK.STORES.EPIC, 'epic')
+            fetchCheapSharkStorePromos(API_CONFIG.CHEAP_SHARK.STORES.GOG, 'cs-gog'),
+            fetchCheapSharkStorePromos(API_CONFIG.CHEAP_SHARK.STORES.EPIC, 'cs-epic'),
+            fetchCheapSharkStorePromos(API_CONFIG.CHEAP_SHARK.STORES.EA, 'cs-ea'),
+            fetchCheapSharkStorePromos(API_CONFIG.CHEAP_SHARK.STORES.UBISOFT, 'cs-ubisoft')
         ]);
 
         for (const promos of batches) {
