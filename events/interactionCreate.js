@@ -1,6 +1,5 @@
 const { handleTicketInteraction } = require('../functions/tickets');
 const staffCommands = require('../staffCommands');
-const { handleTranslationInteraction } = require('../functions/translation');
 
 module.exports = {
     name: 'interactionCreate',
@@ -10,10 +9,6 @@ module.exports = {
             const isStaffCommand = await staffCommands.handleInteraction(interaction, client);
             if (isStaffCommand) return;
             
-            // Then handle translation interactions
-            const isTranslationInteraction = await handleTranslationInteraction(interaction, client);
-            if (isTranslationInteraction) return;
-
             // Then handle ticket buttons
             if (interaction.isButton()) {
                 await handleTicketInteraction(interaction, client);
