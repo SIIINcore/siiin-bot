@@ -15,6 +15,7 @@ const API_CONFIG = require('../../config/apiConfig');
 const { delay, truncateText } = require('../../utils/helpers');
 
 const APPBRAIN_ANDROID_URL = 'https://www.appbrain.com/stats/google-play-rankings/top_free/all/us';
+const APPBRAIN_ANDROID_GAMES_URL = 'https://www.appbrain.com/stats/google-play-rankings/top_free/game/us';
 const APPLE_TOP_FREE_URL = 'https://rss.marketingtools.apple.com/api/v2/us/apps/top-free/10/apps.json';
 
 async function safeFetchText(url, timeout = 15000) {
@@ -182,11 +183,51 @@ function parseTopAndroidFromAppBrain(html) {
     return apps;
 }
 
+
+function buildAndroidGenericEntries() {
+    return [
+        {
+            id: 'android_topfree_apps_link',
+            title: 'Android Top Free Apps',
+            developer: 'Google Play rankings via AppBrain',
+            rank: 1,
+            url: APPBRAIN_ANDROID_URL,
+            image: 'https://www.google.com/s2/favicons?sz=256&domain_url=https://play.google.com',
+            description: 'Open the latest Android Top Free Apps list. The page updates when the source updates.',
+            platform: 'Android',
+            source: 'AppBrain',
+            sourceLabel: 'Android',
+            footerSource: 'Source: AppBrain',
+            sourceUrl: APPBRAIN_ANDROID_URL,
+            genericLink: true
+        },
+        {
+            id: 'android_topfree_games_link',
+            title: 'Android Top Free Games',
+            developer: 'Google Play rankings via AppBrain',
+            rank: 2,
+            url: APPBRAIN_ANDROID_GAMES_URL,
+            image: 'https://www.google.com/s2/favicons?sz=256&domain_url=https://play.google.com',
+            description: 'Open the latest Android Top Free Games list. The page updates when the source updates.',
+            platform: 'Android',
+            source: 'AppBrain',
+            sourceLabel: 'Android',
+            footerSource: 'Source: AppBrain',
+            sourceUrl: APPBRAIN_ANDROID_GAMES_URL,
+            genericLink: true
+        }
+    ];
+}
+
 async function fetchAndroidTopFreeApps() {
     const html = await safeFetchText(APPBRAIN_ANDROID_URL, 15000);
     const apps = parseTopAndroidFromAppBrain(html);
     console.log(`[MobileTop] Android items parsed: ${apps.length}`);
-    return apps;
+
+    if (apps.length > 0) return apps;
+
+    console.warn('[MobileTop] Falling back to generic Android ranking links.');
+    return buildAndroidGenericEntries();
 }
 
 async function fetchAppleTopFreeApps() {
