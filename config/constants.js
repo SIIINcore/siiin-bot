@@ -70,6 +70,21 @@ module.exports = {
     // ========================
     ALLOWED_FILE_EXTENSIONS: ['.png', '.jpg', '.jpeg', '.gif', '.mp4', '.mov'],
 
+
+
+    // ========================
+    // TRANSLATION
+    // ========================
+    TRANSLATION_CHANNEL_IDS: [
+        '1237650687249092670',
+        '1177257234787471422',
+        '1178517213444046948',
+        '1189391329097166989'
+    ],
+    TRANSLATION_DAILY_LIMIT: Number(process.env.TRANSLATION_DAILY_LIMIT || 3),
+    TRANSLATION_MIN_LENGTH: Number(process.env.TRANSLATION_MIN_LENGTH || 25),
+    OPENAI_TRANSLATE_MODEL: process.env.OPENAI_TRANSLATE_MODEL || 'gpt-4o-mini',
+
     // ========================
     // BOT VERSION
     // ========================
