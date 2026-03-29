@@ -9,9 +9,11 @@ const {
 } = require('discord.js');
 const {
     TRANSLATION_CHANNEL_IDS,
+    TRANSLATION_ROLE_ID,
     TRANSLATION_DAILY_LIMIT,
     TRANSLATION_MIN_LENGTH,
-    OPENAI_TRANSLATE_MODEL
+    OPENAI_TRANSLATE_MODEL,
+    STAFF_IDS
 } = require('../config/constants');
 
 const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, '../data');
@@ -73,8 +75,16 @@ function isEligibleChannel(channelId) {
     return TRANSLATION_CHANNEL_IDS.includes(channelId);
 }
 
-function isEligibleAuthor(message, client) {
-    return !!message.author && !message.author.system;
+function isEligibleAuthor(message) {
+    if (!message.author || message.author.system) return false;
+
+    if (message.author.bot) return true;
+    if (STAFF_IDS.includes(message.author.id)) return true;
+
+    const member = message.member;
+    if (!member) return false;
+
+    return member.roles?.cache?.has?.(TRANSLATION_ROLE_ID) || false;
 }
 
 function extractTranslatableText(message) {
@@ -124,7 +134,7 @@ function hasOnlyLinks(text) {
 
 function shouldOfferTranslation(message, client) {
     if (!message.guild || !isEligibleChannel(message.channel.id)) return false;
-    if (!isEligibleAuthor(message, client)) return false;
+    if (!isEligibleAuthor(message)) return false;
     if (message.reference?.messageId) return false;
     if (message.type !== 0) return false;
     if (isImageOnlyMessage(message)) return false;
