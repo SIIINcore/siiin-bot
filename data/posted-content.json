@@ -1,4 +1,6 @@
 {
-  "freeGames": [],
-  "promos": []
+  "postedGames": [],
+  "postedPromos": [],
+  "postedFreeToPlay": [],
+  "postedMobile": []
 }
