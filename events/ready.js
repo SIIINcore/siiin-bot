@@ -1,20 +1,32 @@
-const { updateAll, softRestart } = require('../functions/contentUpdater');
+const { updateAll, softRestart, postedGames, postedPromos, postedFreeToPlay, postedMobile } = require('../functions/contentUpdater');
 const { sendTicketEmbed } = require('../functions/tickets');
 const { EmbedBuilder } = require('discord.js');
-const { 
-    LOG_CHANNEL_ID, 
-    CHAT_CHANNEL_ID, 
+const {
+    LOG_CHANNEL_ID,
+    CHAT_CHANNEL_ID,
     DONATION_CHANNEL_ID,
     BOT_VERSION,
-    STATS_CHANNEL_ID
+    STATS_CHANNEL_ID,
+    SEARCH_CHANNEL_ID
 } = require('../config/constants');
 const staffCommands = require('../staffCommands');
 
 let lastVersionLogged = null;
 
-async function updateStatsEmbed(guild, client, postedGames, postedPromos, postedFreeToPlay) {
+function buildMonoBar(percent = 0.8, total = 20) {
+    const filled = Math.max(0, Math.min(total, Math.round(total * percent)));
+    const empty = Math.max(0, total - filled);
+    return `${'▬'.repeat(filled)}${'▭'.repeat(empty)}`;
+}
+
+function buildClassProgress(count) {
+    if (count <= 0) return '▭';
+    return '▬'.repeat(Math.min(10, Math.ceil(count / 10)));
+}
+
+async function updateStatsEmbed(guild, client, freeGamesSet, promosSet, freeToPlaySet, mobileSet) {
     try {
-        const channel = await guild.channels.fetch(STATS_CHANNEL_ID);
+        const channel = await guild.channels.fetch(STATS_CHANNEL_ID).catch(() => null);
         if (!channel) return;
 
         await guild.members.fetch();
@@ -22,33 +34,35 @@ async function updateStatsEmbed(guild, client, postedGames, postedPromos, posted
         const botCount = guild.members.cache.filter(m => m.user.bot).size;
         const humanCount = totalMembers - botCount;
 
-        const maxBlocks = 20;
-        const progress = Math.min(totalMembers / 1000, 1);
-        const filledBlocks = Math.round(progress * maxBlocks);
-        const emptyBlocks = maxBlocks - filledBlocks;
-        const bar = '🟥'.repeat(filledBlocks) + '⬛'.repeat(emptyBlocks);
-
         const embed = new EmbedBuilder()
-            .setTitle('📊 **S E R V E R   S T A T S**')
-            .setColor('#FF0000')
-            .setDescription(`${bar}\n\n👥 **Total members:** ${totalMembers}\n🧑 **Peoples:** ${humanCount}\n🤖 **Apps:** ${botCount}`)
-            .addFields(
-                { name: '🎮 Free games', value: `${postedGames.size} posted`, inline: true },
-                { name: '🏪 Promotions', value: `${postedPromos.size} posted`, inline: true },
-                { name: '🆓 Free-to-play', value: `${postedFreeToPlay.size} posted`, inline: true }
+            .setTitle('📊 **S E R V E R      S T A T S**')
+            .setColor('#66C2FF')
+            .setDescription(
+                `${buildMonoBar(0.8)}\n\n` +
+                `👥 **Total members:** ${totalMembers}\n` +
+                `🧑 **People:** ${humanCount}\n` +
+                `🤖 **Apps:** ${botCount}`
             )
+            .addFields({
+                name: 'Content tracking',
+                value:
+                    `🎮 **Free games** — ${freeGamesSet.size} posted\n${buildClassProgress(freeGamesSet.size)}\n` +
+                    `🏪 **Promotions** — ${promosSet.size} posted\n${buildClassProgress(promosSet.size)}\n` +
+                    `🆓 **Free-to-play** — ${freeToPlaySet.size} posted\n${buildClassProgress(freeToPlaySet.size)}\n` +
+                    `📱 **Mobile** — ${mobileSet.size} posted\n${buildClassProgress(mobileSet.size)}`,
+                inline: false
+            })
             .setFooter({ text: 'SIIIN Stats • Automatic update' })
             .setTimestamp();
 
         const messages = await channel.messages.fetch({ limit: 5 });
         const botMessages = messages.filter(m => m.author.id === client.user.id);
-        
+
         if (botMessages.size > 0) {
             await botMessages.first().edit({ embeds: [embed] });
         } else {
             await channel.send({ embeds: [embed] });
         }
-        
     } catch (err) {
         console.error('[Stats] Error:', err.message);
     }
@@ -56,9 +70,9 @@ async function updateStatsEmbed(guild, client, postedGames, postedPromos, posted
 
 async function sendDonationMessage(client) {
     try {
-        const channel = await client.channels.fetch(DONATION_CHANNEL_ID);
+        const channel = await client.channels.fetch(DONATION_CHANNEL_ID).catch(() => null);
         if (!channel) {
-            console.warn("❌ Donation channel not found!");
+            console.warn('❌ Donation channel not found!');
             return;
         }
 
@@ -68,7 +82,7 @@ async function sendDonationMessage(client) {
         }
 
         const embed = new EmbedBuilder()
-            .setTitle("💝 Support the Developers")
+            .setTitle('💝 Support the Developers')
             .setDescription(
 `Thank you for considering to support our work!
 
@@ -84,10 +98,33 @@ Your donations help us maintain and improve the server, as well as cover hosting
             .setTimestamp();
 
         await channel.send({ embeds: [embed] });
-        console.log("✅ Donation message sent!");
-        
     } catch (err) {
         console.error('[DonationMessage] Error:', err.message);
+    }
+}
+
+async function sendSearchLinksMessage(client) {
+    try {
+        const channel = await client.channels.fetch(SEARCH_CHANNEL_ID).catch(() => null);
+        if (!channel) return;
+
+        const messages = await channel.messages.fetch({ limit: 20 });
+        for (const [, msg] of messages.filter(m => m.author.id === client.user.id)) {
+            await msg.delete().catch(() => {});
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('🔎 Search | Common links')
+            .setColor(0x66C2FF)
+            .setDescription(
+                `[Informations](https://discord.com/channels/1033462383798140978/1177257234787471422) ▪ <#1468126872297672928> ▪ <#1469855556356542649> ▪ <#1469855518695624725> ▪ <#1487769618733858956> ▪ [Support Rules](https://discord.com/channels/1033462383798140978/1379581746466783385/1379584565466763307) ▪ <#1189391329097166989> ▪ <#1468090646442279206> ▪ <#1376863261625946173>`
+            )
+            .setFooter({ text: 'SIIIN Search • Refreshed on every bot reboot' })
+            .setTimestamp();
+
+        await channel.send({ embeds: [embed] });
+    } catch (err) {
+        console.error('[SearchLinks] Error:', err.message);
     }
 }
 
@@ -95,13 +132,13 @@ async function updateChatReminder(channel) {
     try {
         const messages = await channel.messages.fetch({ limit: 10 });
         const botMessages = messages.filter(m => m.author.id === channel.client.user.id);
-        
+
         if (botMessages.size > 0) {
             await botMessages.first().delete().catch(() => {});
         }
 
         const embed = new EmbedBuilder()
-            .setTitle("# Welcome to SIIIN P&+ Discord")
+            .setTitle('# Welcome to SIIIN P&+ Discord')
             .setDescription(
 `▪ You are in the dedicated chat channel, help is welcome here, but this is not the support channel.
 
@@ -118,71 +155,21 @@ Please respect the rules for the happiness of Discord users.`
             .setFooter({ text: 'SIIIN Community • Be respectful' });
 
         await channel.send({ embeds: [embed] });
-        
     } catch (err) {
         console.error('[ChatReminder] Error:', err.message);
     }
 }
 
-// AJOUT: Fonction pour mettre à jour le message d'information
 async function updateInformationMessage(client) {
     try {
-        const INFO_CHANNEL_ID = '1033506664810287134'; // Channel information
-        const EXISTING_MESSAGE_ID = '1469900307688325242'; // ID du message existant
-        
+        const INFO_CHANNEL_ID = '1033506664810287134';
+        const EXISTING_MESSAGE_ID = '1469900307688325242';
+
         const infoChannel = await client.channels.fetch(INFO_CHANNEL_ID).catch(() => null);
-        if (!infoChannel) {
-            console.warn('❌ Information channel not found');
-            return;
-        }
+        if (!infoChannel) return;
 
-        try {
-            const existingMessage = await infoChannel.messages.fetch(EXISTING_MESSAGE_ID);
-            
-            const updatedEmbed = new EmbedBuilder()
-                .setTitle("📋 SIIIN PATCHES & EXTRA - INFORMATION")
-                .setDescription(
-`Welcome to our community! Here you'll find patches, mods, and extras for various games.
-
-**Important links:**
-
-**Server Invitation Link:**
-\`\`\`
-https://discord.gg/eFBDgY2bup
-\`\`\`
-
-**Quick navigation:**
-• [Rules](https://discord.com/channels/1033462383798140978/1177257234787471422/1468570201095274552)
-• <#1237650687249092670>
-• <#1468090646442279206>
-• <#1469855556356542649>
-• <#1469855518695624725>
-
-**[Click to read from the Beginning](https://discord.com/channels/1033462383798140978/1033506664810287134/1440058017545584871)**`
-                )
-                .setColor(0x5865F2)
-                .setFooter({ text: 'SIIIN Community • Updated links' })
-                .setTimestamp();
-
-            await existingMessage.edit({ embeds: [updatedEmbed] });
-            console.log("✅ Information message updated!");
-            
-        } catch (err) {
-            console.error('❌ Cannot edit message, maybe wrong ID or permissions:', err.message);
-            // Fallback: créer un nouveau message
-            await sendNewInformationMessage(client, infoChannel);
-        }
-        
-    } catch (err) {
-        console.error('[UpdateInformationMessage] Error:', err.message);
-    }
-}
-
-// AJOUT: Fonction fallback si le message n'existe plus
-async function sendNewInformationMessage(client, channel) {
-    try {
         const embed = new EmbedBuilder()
-            .setTitle("📋 SIIIN PATCHES & EXTRA - INFORMATION (UPDATED)")
+            .setTitle('📋 SIIIN PATCHES & EXTRA - INFORMATION')
             .setDescription(
 `Welcome to our community! Here you'll find patches, mods, and extras for various games.
 
@@ -199,6 +186,7 @@ https://discord.gg/eFBDgY2bup
 • <#1468090646442279206>
 • <#1469855556356542649>
 • <#1469855518695624725>
+• <#1487769618733858956>
 
 **[Click to read from the Beginning](https://discord.com/channels/1033462383798140978/1033506664810287134/1440058017545584871)**`
             )
@@ -206,36 +194,15 @@ https://discord.gg/eFBDgY2bup
             .setFooter({ text: 'SIIIN Community • Updated links' })
             .setTimestamp();
 
-        const newMessage = await channel.send({ embeds: [embed] });
-        console.log("✅ New information message sent!");
-        
+        try {
+            const existingMessage = await infoChannel.messages.fetch(EXISTING_MESSAGE_ID);
+            await existingMessage.edit({ embeds: [embed] });
+        } catch {
+            await infoChannel.send({ embeds: [embed] });
+        }
     } catch (err) {
-        console.error('[NewInformationMessage] Error:', err.message);
+        console.error('[UpdateInformationMessage] Error:', err.message);
     }
-}
-
-// Fonction pour initialiser Express depuis ready.js
-function setupExpress(client) {
-    const express = require('express');
-    const app = express();
-    const PORT = process.env.PORT || 3000;
-
-    app.use(express.json());
-    
-    app.get(process.env.RAILWAY_HEALTHCHECK_PATH || '/', (req, res) => {
-        res.status(200).json({ 
-            status: 'ok', 
-            bot: client?.user?.tag || 'SIIIN Bot (Starting...)',
-            uptime: process.uptime(),
-            timestamp: new Date().toISOString()
-        });
-    });
-
-    app.listen(PORT, () => {
-        console.log(`🚀 Health check on port ${PORT}`);
-    });
-
-    return app;
 }
 
 module.exports = {
@@ -246,38 +213,30 @@ module.exports = {
         console.log(`📊 Serving ${client.guilds.cache.size} server(s)`);
 
         try {
-            // AJOUT: Mettre à jour le message d'information
             await updateInformationMessage(client);
-            
-            // Initialiser les commandes staff
             await staffCommands.init(client);
-            
-            // Send initial messages
             await sendTicketEmbed(client);
             await sendDonationMessage(client);
-            
-            // Initialize chat reminder
+            await sendSearchLinksMessage(client);
+
             const chatChannel = await client.channels.fetch(CHAT_CHANNEL_ID).catch(() => null);
             if (chatChannel) {
                 await updateChatReminder(chatChannel);
             }
 
-            // Log version to log channel
-            const CURRENT_CHANGELOG = `# VERSION ${BOT_VERSION} - MODULAR UPDATE`;
-            
             if (lastVersionLogged !== BOT_VERSION) {
-                const logChannel = await client.channels.fetch(LOG_CHANNEL_ID);
+                const logChannel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
                 if (logChannel) {
                     const embed = new EmbedBuilder()
-                        .setTitle("🚀 Bot Online / Restarted")
-                        .setColor("#00FF00")
-                        .setDescription(`**Release:** ${BOT_VERSION}\n\n**Changelog:**\n${CURRENT_CHANGELOG}`)
+                        .setTitle('🚀 Bot Online / Restarted')
+                        .setColor('#00FF00')
+                        .setDescription(`**Release:** ${BOT_VERSION}\n\n**Changelog:**\n# VERSION ${BOT_VERSION} - CONTENT UPDATE`)
                         .addFields(
                             { name: '👥 Servers', value: `${client.guilds.cache.size}`, inline: true },
                             { name: '📅 Date', value: new Date().toLocaleDateString('en-US'), inline: true },
                             { name: '⏰ Time', value: new Date().toLocaleTimeString('en-US'), inline: true },
                             { name: '🛡️ Security', value: 'Automod Active', inline: false },
-                            { name: '🎮 APIs', value: 'Steam + Epic + CheapShark', inline: false }
+                            { name: '🎮 APIs', value: 'Steam + Epic + GOG + CheapShark + Mobile', inline: false }
                         )
                         .setTimestamp();
                     await logChannel.send({ embeds: [embed] });
@@ -285,33 +244,30 @@ module.exports = {
                 lastVersionLogged = BOT_VERSION;
             }
 
-            // Initial update
-            const { postedGames, postedPromos, postedFreeToPlay } = require('../functions/contentUpdater');
             await updateAll(client);
-            
-            // Initial stats
-            const guilds = client.guilds.cache;
-            for (const guild of guilds.values()) {
-                await updateStatsEmbed(guild, client, postedGames, postedPromos, postedFreeToPlay);
+
+            for (const guild of client.guilds.cache.values()) {
+                await updateStatsEmbed(guild, client, postedGames, postedPromos, postedFreeToPlay, postedMobile);
             }
-            
-            // Heartbeat every minute
+
             setInterval(() => {
                 console.log('🟢 Bot alive:', new Date().toLocaleTimeString('en-US'));
             }, 60000);
-            
-            // Auto update every 30 minutes
-            setInterval(() => updateAll(client), 30 * 60 * 1000);
-            
-            // Auto-restart every 12 hours
+
+            setInterval(async () => {
+                await updateAll(client);
+                for (const guild of client.guilds.cache.values()) {
+                    await updateStatsEmbed(guild, client, postedGames, postedPromos, postedFreeToPlay, postedMobile);
+                }
+            }, 30 * 60 * 1000);
+
             const hours = Number(process.env.AUTO_REBOOT_HOURS || 12);
             if (hours > 0) {
                 setInterval(() => softRestart(client), hours * 60 * 60 * 1000);
                 console.log(`⏱️ Autorestart every ${hours}h`);
             }
-            
         } catch (err) {
-            console.error("❌ Startup error:", err.message);
+            console.error('❌ Startup error:', err.message);
         }
     }
 };
