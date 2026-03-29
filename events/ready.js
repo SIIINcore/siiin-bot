@@ -10,6 +10,7 @@ const {
     SEARCH_CHANNEL_ID
 } = require('../config/constants');
 const staffCommands = require('../staffCommands');
+const { ensureHelpersForChannel } = require('../functions/translation');
 
 let lastVersionLogged = null;
 
@@ -218,6 +219,11 @@ module.exports = {
             await sendTicketEmbed(client);
             await sendDonationMessage(client);
             await sendSearchLinksMessage(client);
+
+            for (const channelId of ['1237650687249092670', '1177257234787471422', '1178517213444046948', '1189391329097166989']) {
+                const translationChannel = await client.channels.fetch(channelId).catch(() => null);
+                if (translationChannel) await ensureHelpersForChannel(translationChannel, client);
+            }
 
             const chatChannel = await client.channels.fetch(CHAT_CHANNEL_ID).catch(() => null);
             if (chatChannel) {
