@@ -75,6 +75,28 @@ function saveState() {
     }
 }
 
+
+function faviconForDomain(domain) {
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+}
+
+function getBrandMeta(label = '', platform = '') {
+    const key = String(label || platform || '').toLowerCase();
+
+    const brands = [
+        { match: ['steam', 'cs steam'], name: 'Steam', icon: faviconForDomain('store.steampowered.com') },
+        { match: ['epic games', 'cs epicgames', 'cs epic'], name: 'Epic Games', icon: faviconForDomain('store.epicgames.com') },
+        { match: ['gog', 'cs gog'], name: 'GOG', icon: faviconForDomain('gog.com') },
+        { match: ['ea', 'cs ea'], name: 'EA', icon: faviconForDomain('ea.com') },
+        { match: ['ubisoft', 'cs ubisoft'], name: 'Ubisoft', icon: faviconForDomain('ubisoft.com') },
+        { match: ['apple', 'apple rss'], name: 'Apple', icon: faviconForDomain('apple.com') },
+        { match: ['android'], name: 'Android', icon: faviconForDomain('play.google.com') }
+    ];
+
+    const found = brands.find(brand => brand.match.some(value => key.includes(value)));
+    return found || { name: label || platform || 'Store', icon: faviconForDomain('discord.com') };
+}
+
 const initialState = loadState();
 let postedGames = initialState.postedGames;
 let postedPromos = initialState.postedPromos;
@@ -101,14 +123,18 @@ async function postFreeGames(channel) {
             const config = platformConfig[game.store] || platformConfig.other;
             const isFreeWeekend = game.type === 'free_weekend';
 
+            const brand = getBrandMeta(game.sourceLabel, game.platform);
+
             const embed = new EmbedBuilder()
                 .setTitle(`${config.emoji} ${game.title}`)
                 .setURL(game.url)
                 .setDescription(truncateText(game.description, 300) || 'Free content available now.')
                 .setColor(config.color)
+                .setAuthor({ name: brand.name, iconURL: brand.icon, url: game.url })
                 .setTimestamp();
 
             if (game.image) embed.setImage(game.image);
+            embed.setThumbnail(brand.icon);
 
             if (isFreeWeekend) {
                 embed
@@ -161,10 +187,13 @@ async function postPromos(channel) {
                 'cs-ubisoft': '🌀'
             }[promo.store] || '🏪';
 
+            const brand = getBrandMeta(promo.sourceLabel, promo.store);
+
             const embed = new EmbedBuilder()
                 .setTitle(`${storeEmoji} ${promo.title}`)
                 .setURL(promo.url)
                 .setDescription(truncateText(promo.description || 'Limited-time promotion.', 200))
+                .setAuthor({ name: brand.name, iconURL: brand.icon, url: promo.url })
                 .setColor(
                     promo.discountPercent >= 70 ? '#FF0000' :
                     promo.discountPercent >= 50 ? '#FF9900' : '#00FF99'
@@ -173,6 +202,7 @@ async function postPromos(channel) {
                 .setTimestamp();
 
             if (promo.image) embed.setImage(promo.image);
+            embed.setThumbnail(brand.icon);
 
             const fields = [
                 { name: 'Original Price', value: `$${promo.normalPrice}`, inline: true },
@@ -208,15 +238,19 @@ async function postFreeToPlayGames(channel) {
         for (const game of games) {
             if (postedFreeToPlay.has(game.id)) continue;
 
+            const brand = getBrandMeta(game.platform, game.platform);
+
             const embed = new EmbedBuilder()
                 .setTitle(`🎮 ${game.title}`)
                 .setURL(game.url)
                 .setDescription(truncateText(game.description, 400) || 'Free-to-play game available now.')
                 .setColor('#7289DA')
+                .setAuthor({ name: brand.name, iconURL: brand.icon, url: game.url })
                 .setFooter({ text: 'Free-to-Play • Always available' })
                 .setTimestamp();
 
             if (game.image) embed.setImage(game.image);
+            embed.setThumbnail(brand.icon);
 
             const fields = [
                 { name: 'Platform', value: game.platform, inline: true },
@@ -256,15 +290,19 @@ async function postMobileApps(channel) {
             const color = app.platform === 'Apple' ? '#f5f5f7' : '#66c2ff';
             const emoji = app.platform === 'Apple' ? '🍎' : '🤖';
 
+            const brand = getBrandMeta(app.sourceLabel, app.platform);
+
             const embed = new EmbedBuilder()
                 .setTitle(`${emoji} ${app.title}`)
                 .setURL(app.url)
                 .setDescription(truncateText(app.description || 'Top free mobile app.', 240))
                 .setColor(color)
-                .addFields(
+                .setAuthor({ name: brand.name, iconURL: brand.icon, url: app.sourceUrl || app.url })
+.addFields(
                     { name: 'Platform', value: app.sourceLabel || app.platform, inline: true },
                     { name: 'Rank', value: `#${app.rank}`, inline: true },
-                    { name: 'Developer', value: truncateText(app.developer || 'Unknown developer', 100), inline: true }
+                    { name: 'Developer', value: truncateText(app.developer || 'Unknown developer', 100), inline: true },
+                    { name: 'Source', value: app.sourceUrl ? `[Open source](${app.sourceUrl})` : (app.footerSource || 'Source'), inline: false }
                 )
                 .setFooter({ text: `${app.footerSource || 'Source'} • Top Free` })
                 .setTimestamp();
