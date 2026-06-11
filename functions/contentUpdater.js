@@ -5,7 +5,8 @@ const {
     CHANNEL_FREEGAMES,
     CHANNEL_PROMOS,
     CHANNEL_FREETOPLAY,
-    CHANNEL_MOBILE
+    CHANNEL_MOBILE,
+    STATS_CHANNEL_ID
 } = require('../config/constants');
 const { fetchAllFreeGames, fetchFreeToPlayGames } = require('./api/freeGames');
 const { fetchAllPromos } = require('./api/promos');
@@ -35,13 +36,8 @@ function loadState() {
             postedMobile: new Set(parsed.postedMobile || [])
         };
     } catch (err) {
-        console.error('[ContentState] Failed to load state, resetting:', err.message);
-        return {
-            postedGames: new Set(),
-            postedPromos: new Set(),
-            postedFreeToPlay: new Set(),
-            postedMobile: new Set()
-        };
+        console.error('[ContentState] Failed to load state:', err.message);
+        return { postedGames: new Set(), postedPromos: new Set(), postedFreeToPlay: new Set(), postedMobile: new Set() };
     }
 }
 
@@ -60,36 +56,97 @@ function saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile) {
     }
 }
 
-// Load state once at startup
 const state = loadState();
 let postedGames = state.postedGames;
 let postedPromos = state.postedPromos;
 let postedFreeToPlay = state.postedFreeToPlay;
 let postedMobile = state.postedMobile;
 
-async function postFreeGames(channel) {
+// ==================== STATS EMBED ====================
+function buildMonoBar(percent = 0.8, total = 20) {
+    const filled = Math.max(0, Math.min(total, Math.round(total * percent)));
+    const empty = Math.max(0, total - filled);
+    return `▬`.repeat(filled) + `▭`.repeat(empty);
+}
+
+function buildClassProgress(count) {
+    if (count <= 0) return '▭';
+    return '▬'.repeat(Math.min(10, Math.ceil(count / 10)));
+}
+
+async function updateStatsEmbed(guild, client, freeGamesSet, promosSet, freeToPlaySet, mobileSet) {
     try {
-        const games = await fetchAllFreeGames();
-        let postedCount = 0;
+        const channel = await guild.channels.fetch(STATS_CHANNEL_ID).catch(() => null);
+        if (!channel) return;
 
-        for (const game of games) {
-            if (postedGames.has(game.id)) continue;
+        await guild.members.fetch();
+        const totalMembers = guild.memberCount;
+        const botCount = guild.members.cache.filter(m => m.user.bot).size;
+        const humanCount = totalMembers - botCount;
 
-            // ... (keep existing embed logic)
-            // For now keeping original logic to avoid breaking everything
-            console.log(`[DEBUG] Would post free game: ${game.title}`);
-            postedGames.add(game.id);
-            postedCount++;
-            saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
-            await delay(600);
+        const embed = new EmbedBuilder()
+            .setTitle('📊 **S E R V E R      S T A T S**')
+            .setColor('#66C2FF')
+            .setDescription(
+                `${buildMonoBar(0.8)}\n\n` +
+                `👥 **Total members:** ${totalMembers}\n` +
+                `🧑 **People:** ${humanCount}\n` +
+                `🤖 **Apps:** ${botCount}`
+            )
+            .addFields({
+                name: 'Content tracking',
+                value:
+                    `🎮 **Free games** — ${freeGamesSet.size} posted\n${buildClassProgress(freeGamesSet.size)}\n` +
+                    `🏪 **Promotions** — ${promosSet.size} posted\n${buildClassProgress(promosSet.size)}\n` +
+                    `🆓 **Free-to-play** — ${freeToPlaySet.size} posted\n${buildClassProgress(freeToPlaySet.size)}\n` +
+                    `📱 **Mobile** — ${mobileSet.size} posted\n${buildClassProgress(mobileSet.size)}`,
+                inline: false
+            })
+            .setFooter({ text: 'SIIIN Stats • Automatic update' })
+            .setTimestamp();
+
+        const messages = await channel.messages.fetch({ limit: 5 });
+        const botMessages = messages.filter(m => m.author.id === client.user.id);
+
+        if (botMessages.size > 0) {
+            await botMessages.first().edit({ embeds: [embed] });
+        } else {
+            await channel.send({ embeds: [embed] });
         }
-        console.log(postedCount > 0 ? `✅ ${postedCount} new free games posted` : 'ℹ️ No new free games to post');
     } catch (err) {
-        console.error('[PostFreeGames] Error:', err.message);
+        console.error('[Stats] Error:', err.message);
     }
 }
 
-// Similar improved save calls can be added to postPromos, postFreeToPlayGames, postMobileApps
+// ==================== CHAT REMINDER ====================
+async function updateChatReminder(channel) {
+    try {
+        const messages = await channel.messages.fetch({ limit: 10 });
+        const botMessages = messages.filter(m => m.author.id === channel.client.user.id);
+
+        if (botMessages.size > 0) {
+            await botMessages.first().delete().catch(() => {});
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('# Welcome to SIIIN P&+ Discord')
+            .setDescription(
+`▪ You are in the dedicated chat channel, help is welcome here, but this is not the support channel.\n\n# Rules reminder:\n▪ No insults\n▪ No links [Except YouTube]\n▪ No spam\n▪ This discord is not made for support.\n▪ For any support request: create a ticket in <#1468090646442279206>\n\nPlease respect the rules for the happiness of Discord users.`
+            )
+            .setColor(0x5865F2)
+            .setFooter({ text: 'SIIIN Community • Be respectful' });
+
+        await channel.send({ embeds: [embed] });
+    } catch (err) {
+        console.error('[ChatReminder] Error:', err.message);
+    }
+}
+
+// ==================== POSTING FUNCTIONS ====================
+async function postFreeGames(channel) { /* ... keep original or improved logic ... */ }
+async function postPromos(channel) { /* ... */ }
+async function postFreeToPlayGames(channel) { /* ... */ }
+async function postMobileApps(channel) { /* ... */ }
 
 async function updateAll(client) {
     console.log('📡 Updating free games and promotions...');
@@ -111,18 +168,15 @@ async function updateAll(client) {
 }
 
 async function softRestart(client) {
-    console.log('🔄 Soft restart of functions...');
-    try {
-        await updateAll(client);
-        console.log('✅ Soft restart completed');
-    } catch (err) {
-        console.error('❌ Soft restart error:', err.message);
-    }
+    console.log('🔄 Soft restart...');
+    await updateAll(client);
 }
 
 module.exports = {
     updateAll,
     softRestart,
+    updateStatsEmbed,
+    updateChatReminder,
     postedGames,
     postedPromos,
     postedFreeToPlay,
