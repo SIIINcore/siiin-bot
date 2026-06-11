@@ -11,14 +11,13 @@ require('dotenv').config();
 const staffCommands = require('./staffCommands');
 
 // ================================
-// EXPRESS STARTUP (Cut flag)
+// EXPRESS STARTUP (Healthcheck immédiat)
 // ================================
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Health check IMMÉDIAT, sans dépendre du client Discord
 app.get(process.env.RAILWAY_HEALTHCHECK_PATH || '/', (req, res) => {
     res.status(200).json({ 
         status: 'ok', 
@@ -69,12 +68,27 @@ process.on('unhandledRejection', (error) => {
 });
 
 // ================================
-// START BOT
+// START BOT (avec retry)
 // ================================
-client.login(process.env.BOT_TOKEN).catch(err => {
-    console.error('❌ Discord connection error:', err);
-    process.exit(1);
-});
+const loginWithRetry = async (retries = 5) => {
+    for (let i = 0; i < retries; i++) {
+        try {
+            await client.login(process.env.BOT_TOKEN);
+            console.log('✅ Successfully logged in to Discord');
+            return;
+        } catch (err) {
+            console.error(`❌ Discord login attempt ${i + 1}/${retries} failed:`, err.message);
+            if (i < retries - 1) {
+                console.log('⏳ Retrying in 10 seconds...');
+                await new Promise(resolve => setTimeout(resolve, 10000));
+            }
+        }
+    }
+    console.error('❌ All login attempts failed after retries.');
+    // On ne fait plus de process.exit(1) pour éviter la boucle Railway
+};
+
+loginWithRetry();
 
 // ================================
 // END OF SIIIN CORE
