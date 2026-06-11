@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const { EmbedBuilder } = require('discord.js');
-const { CHANNEL_FREEGAMES, CHANNEL_PROMOS, CHANNEL_FREETOPLAY, CHANNEL_MOBILE, STATS_CHANNEL_ID } = require('../config/constants');
+const {
+    CHANNEL_FREEGAMES, CHANNEL_PROMOS, CHANNEL_FREETOPLAY, CHANNEL_MOBILE, STATS_CHANNEL_ID
+} = require('../config/constants');
 const { fetchAllFreeGames, fetchFreeToPlayGames } = require('./api/freeGames');
 const { fetchAllPromos } = require('./api/promos');
 const { fetchAllMobileTopApps } = require('./api/mobileTop');
@@ -43,7 +45,7 @@ function saveState(games, promos, f2p, mobile) {
             postedFreeToPlay: Array.from(f2p).slice(-MAX_SAVED_IDS),
             postedMobile: Array.from(mobile).slice(-MAX_SAVED_IDS)
         }, null, 2));
-    } catch (e) { console.error('[SaveState] Error', e.message); }
+    } catch (e) {}
 }
 
 const state = loadState();
@@ -52,104 +54,77 @@ let postedPromos = state.postedPromos;
 let postedFreeToPlay = state.postedFreeToPlay;
 let postedMobile = state.postedMobile;
 
-// Brand helper
 function getBrand(store) {
-    const brands = {
+    const map = {
         steam: { name: 'Steam', icon: 'https://store.steampowered.com/favicon.ico' },
-        'cheapshark-steam': { name: 'Steam (CheapShark)', icon: 'https://store.steampowered.com/favicon.ico' },
+        'cheapshark-steam': { name: 'Steam', icon: 'https://store.steampowered.com/favicon.ico' },
         'cs-gog': { name: 'GOG', icon: 'https://www.gog.com/favicon.ico' },
         'cs-ea': { name: 'EA', icon: 'https://www.ea.com/favicon.ico' },
         'cs-ubisoft': { name: 'Ubisoft', icon: 'https://store.ubisoft.com/favicon.ico' },
-        epic: { name: 'Epic Games', icon: 'https://store.epicgames.com/favicon.ico' },
+        epic: { name: 'Epic Games', icon: 'https://store.epicgames.com/favicon.ico' }
     };
-    return brands[store] || { name: store, icon: 'https://discord.com/assets/2c21aeda16de354ba5334551a883b481.png' };
+    return map[store] || { name: store, icon: 'https://discord.com/assets/2c21aeda16de354ba5334551a883b481.png' };
 }
 
-// ==================== POST PROMOS ====================
 async function postPromos(channel) {
     const promos = await fetchAllPromos();
     let count = 0;
-
     for (const p of promos) {
         if (postedPromos.has(p.id)) continue;
-
         const brand = getBrand(p.store);
         const embed = new EmbedBuilder()
             .setTitle(`🎮 ${p.title}`)
             .setURL(p.url)
-            .setColor(p.discountPercent >= 70 ? 0xFF0000 : p.discountPercent >= 50 ? 0xFF9900 : 0x00FF99)
+            .setColor(p.discountPercent >= 70 ? 0xFF0000 : 0xFF9900)
             .setAuthor({ name: brand.name, iconURL: brand.icon })
-            .setThumbnail(brand.icon)
             .addFields(
-                { name: 'Original Price', value: `$${p.originalPriceUSD} / €${p.originalPriceEUR}`, inline: true },
-                { name: 'Sale Price', value: `$${p.priceUSD} / €${p.priceEUR}`, inline: true },
+                { name: 'Original', value: `$${p.originalPriceUSD} / €${p.originalPriceEUR}`, inline: true },
+                { name: 'Sale', value: `$${p.priceUSD} / €${p.priceEUR}`, inline: true },
                 { name: 'Discount', value: `**${p.discountPercent}% OFF**`, inline: true }
             )
-            .setFooter({ text: `${brand.name} • Limited time offer` })
-            .setTimestamp();
-
+            .setFooter({ text: brand.name });
         if (p.image) embed.setImage(p.image);
-
         await channel.send({ embeds: [embed] });
         postedPromos.add(p.id);
         count++;
         saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
-        await delay(700);
+        await delay(650);
     }
-    console.log(count > 0 ? `✅ ${count} new promotions posted` : 'ℹ️ No new promotions');
+    if (count) console.log(`✅ ${count} promotions posted`);
 }
 
-// ==================== POST FREE GAMES ====================
 async function postFreeGames(channel) {
     const games = await fetchAllFreeGames();
     let count = 0;
-
     for (const g of games) {
         if (postedGames.has(g.id)) continue;
-
         const brand = getBrand(g.store);
         const embed = new EmbedBuilder()
             .setTitle(`🎮 ${g.title}`)
             .setURL(g.url)
             .setColor(0x00AAFF)
             .setAuthor({ name: brand.name, iconURL: brand.icon })
-            .setThumbnail(brand.icon)
-            .addFields(
-                { name: 'Status', value: '**FREE**', inline: true },
-                { name: 'Original Price', value: `$${g.originalPriceUSD || 'N/A'} / €${g.originalPriceEUR || 'N/A'}`, inline: true }
-            )
-            .setFooter({ text: `${brand.name} • Free offer` })
-            .setTimestamp();
-
+            .addFields({ name: 'Status', value: '**FREE**', inline: true });
+        if (g.originalPriceUSD) {
+            embed.addFields({ name: 'Was', value: `$${g.originalPriceUSD} / €${g.originalPriceEUR}`, inline: true });
+        }
         if (g.image) embed.setImage(g.image);
-        if (g.endDate) embed.addFields({ name: 'Ends', value: g.endDate, inline: false });
-
         await channel.send({ embeds: [embed] });
         postedGames.add(g.id);
         count++;
         saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
-        await delay(700);
+        await delay(650);
     }
-    console.log(count > 0 ? `✅ ${count} new free games posted` : 'ℹ️ No new free games');
+    if (count) console.log(`✅ ${count} free games posted`);
 }
 
 async function updateAll(client) {
-    console.log('📡 Updating content...');
-    const [freeCh, promoCh] = await Promise.all([
-        client.channels.fetch(CHANNEL_FREEGAMES).catch(() => null),
-        client.channels.fetch(CHANNEL_PROMOS).catch(() => null)
-    ]);
-
+    const freeCh = await client.channels.fetch(CHANNEL_FREEGAMES).catch(() => null);
+    const promoCh = await client.channels.fetch(CHANNEL_PROMOS).catch(() => null);
     if (freeCh) await postFreeGames(freeCh);
     if (promoCh) await postPromos(promoCh);
-
-    console.log('✅ Update done.');
 }
 
 module.exports = {
-    updateAll,
-    postedGames,
-    postedPromos,
-    postedFreeToPlay,
-    postedMobile
+    updateAll, postedGames, postedPromos, postedFreeToPlay, postedMobile
 };
