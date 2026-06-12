@@ -2,7 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const { EmbedBuilder } = require('discord.js');
 const {
-    CHANNEL_FREEGAMES, CHANNEL_PROMOS, CHANNEL_FREETOPLAY, CHANNEL_MOBILE, STATS_CHANNEL_ID
+    CHANNEL_FREEGAMES,
+    CHANNEL_PROMOS,
+    CHANNEL_FREETOPLAY,
+    CHANNEL_MOBILE
 } = require('../config/constants');
 const { fetchAllFreeGames, fetchFreeToPlayGames } = require('./api/freeGames');
 const { fetchAllPromos } = require('./api/promos');
@@ -66,65 +69,95 @@ function getBrand(store) {
     return map[store] || { name: store, icon: 'https://discord.com/assets/2c21aeda16de354ba5334551a883b481.png' };
 }
 
-async function postPromos(channel) {
-    const promos = await fetchAllPromos();
-    let count = 0;
-    for (const p of promos) {
-        if (postedPromos.has(p.id)) continue;
-        const brand = getBrand(p.store);
-        const embed = new EmbedBuilder()
-            .setTitle(`🎮 ${p.title}`)
-            .setURL(p.url)
-            .setColor(p.discountPercent >= 70 ? 0xFF0000 : 0xFF9900)
-            .setAuthor({ name: brand.name, iconURL: brand.icon })
-            .addFields(
-                { name: 'Original', value: `$${p.originalPriceUSD} / €${p.originalPriceEUR}`, inline: true },
-                { name: 'Sale', value: `$${p.priceUSD} / €${p.priceEUR}`, inline: true },
-                { name: 'Discount', value: `**${p.discountPercent}% OFF**`, inline: true }
-            )
-            .setFooter({ text: brand.name });
-        if (p.image) embed.setImage(p.image);
-        await channel.send({ embeds: [embed] });
-        postedPromos.add(p.id);
-        count++;
-        saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
-        await delay(650);
-    }
-    if (count) console.log(`✅ ${count} promotions posted`);
-}
-
+// ==================== FREE GAMES (TEMPORARY) ====================
 async function postFreeGames(channel) {
     const games = await fetchAllFreeGames();
     let count = 0;
+
     for (const g of games) {
         if (postedGames.has(g.id)) continue;
+
+        // Only show original price if it was actually paid before
+        const showOriginalPrice = g.originalPriceUSD && parseFloat(g.originalPriceUSD) > 0;
+
         const brand = getBrand(g.store);
         const embed = new EmbedBuilder()
             .setTitle(`🎮 ${g.title}`)
             .setURL(g.url)
             .setColor(0x00AAFF)
-            .setAuthor({ name: brand.name, iconURL: brand.icon })
-            .addFields({ name: 'Status', value: '**FREE**', inline: true });
-        if (g.originalPriceUSD) {
+            .setAuthor({ name: brand.name, iconURL: brand.icon });
+
+        if (g.image) embed.setImage(g.image);
+
+        embed.addFields({ name: 'Status', value: '**FREE**', inline: true });
+
+        if (showOriginalPrice) {
             embed.addFields({ name: 'Was', value: `$${g.originalPriceUSD} / €${g.originalPriceEUR}`, inline: true });
         }
-        if (g.image) embed.setImage(g.image);
+
+        if (g.endDate) {
+            embed.addFields({ name: 'Ends', value: g.endDate, inline: false });
+        }
+
+        embed.setFooter({ text: brand.name });
+
         await channel.send({ embeds: [embed] });
         postedGames.add(g.id);
         count++;
         saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
         await delay(650);
     }
-    if (count) console.log(`✅ ${count} free games posted`);
+
+    if (count) console.log(`✅ ${count} temporary free games posted`);
+}
+
+// ==================== FREE TO PLAY (PERMANENT) ====================
+async function postFreeToPlayGames(channel) {
+    const games = await fetchFreeToPlayGames();
+    let count = 0;
+
+    for (const g of games) {
+        if (postedFreeToPlay.has(g.id)) continue;
+
+        const brand = getBrand(g.store || 'steam');
+        const embed = new EmbedBuilder()
+            .setTitle(`🎮 ${g.title}`)
+            .setURL(g.url)
+            .setColor(0x7289DA)
+            .setAuthor({ name: brand.name, iconURL: brand.icon })
+            .addFields(
+                { name: 'Status', value: '**FREE TO PLAY**', inline: true },
+                { name: 'Platform', value: g.platform || 'Steam', inline: true }
+            );
+
+        if (g.image) embed.setImage(g.image);
+
+        embed.setFooter({ text: 'Free to Play • Always available' });
+
+        await channel.send({ embeds: [embed] });
+        postedFreeToPlay.add(g.id);
+        count++;
+        saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
+        await delay(650);
+    }
+
+    if (count) console.log(`✅ ${count} free-to-play games posted`);
 }
 
 async function updateAll(client) {
     const freeCh = await client.channels.fetch(CHANNEL_FREEGAMES).catch(() => null);
     const promoCh = await client.channels.fetch(CHANNEL_PROMOS).catch(() => null);
+    const f2pCh = await client.channels.fetch(CHANNEL_FREETOPLAY).catch(() => null);
+
     if (freeCh) await postFreeGames(freeCh);
     if (promoCh) await postPromos(promoCh);
+    if (f2pCh) await postFreeToPlayGames(f2pCh);
 }
 
 module.exports = {
-    updateAll, postedGames, postedPromos, postedFreeToPlay, postedMobile
+    updateAll,
+    postedGames,
+    postedPromos,
+    postedFreeToPlay,
+    postedMobile
 };
