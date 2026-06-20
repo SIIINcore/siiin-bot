@@ -131,7 +131,7 @@ function parseTopAndroidFromAppBrain(html) {
 
     const startIndex = normalizedLines.findIndex(line => /Rank\s+App\s+Category\s+Rating\s+Installs\s+Recent/i.test(line));
     if (startIndex === -1) {
-        console.warn('[MobileTop] AppBrain ranking table not found.');
+        console.warn('[MobileTop] AppBrain ranking table not found. Using fallback.');
         return [];
     }
 
@@ -183,7 +183,6 @@ function parseTopAndroidFromAppBrain(html) {
     return apps;
 }
 
-
 function buildAndroidGenericEntries() {
     return [
         {
@@ -220,13 +219,17 @@ function buildAndroidGenericEntries() {
 }
 
 async function fetchAndroidTopFreeApps() {
+    console.log('📱 Fetching Android Top Free apps (via AppBrain scraping)...');
+
     const html = await safeFetchText(APPBRAIN_ANDROID_URL, 15000);
     const apps = parseTopAndroidFromAppBrain(html);
-    console.log(`[MobileTop] Android items parsed: ${apps.length}`);
 
-    if (apps.length > 0) return apps;
+    if (apps.length > 0) {
+        console.log(`✅ ${apps.length} Android apps parsed successfully`);
+        return apps;
+    }
 
-    console.warn('[MobileTop] Falling back to generic Android ranking links.');
+    console.warn('⚠️ AppBrain scraping failed or returned no results. Using fallback links.');
     return buildAndroidGenericEntries();
 }
 
