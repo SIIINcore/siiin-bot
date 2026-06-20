@@ -1,11 +1,13 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const { STAFF_IDS } = require('./config/constants');
+
+let commands = [];
 
 module.exports = {
     // Initialize commands
     init: async (client) => {
         console.log('🔧 Initializing staff commands...');
-        
+
         // /say command
         const sayCommand = new SlashCommandBuilder()
             .setName('say')
@@ -19,71 +21,134 @@ module.exports = {
                 option.setName('channel')
                     .setDescription('Channel to send the message to')
                     .setRequired(true));
-        
-        // Register command
+
+        commands.push(sayCommand);
+
+        // ========================
+        // /SYBan command
+        // ========================
+        const sybanCommand = new SlashCommandBuilder()
+            .setName('syban')
+            .setDescription('Ban a user with logging (only works in Ban channel)')
+            .addUserOption(option =>
+                option.setName('user')
+                    .setDescription('User to ban')
+                    .setRequired(true))
+            .addStringOption(option =>
+                option.setName('reason')
+                    .setDescription('Reason for the ban')
+                    .setRequired(true));
+
+        commands.push(sybanCommand);
+
+        // Register commands
         try {
-            await client.application.commands.set([sayCommand]);
-            console.log('✅ Staff command /say registered');
+            await client.application.commands.set(commands);
+            console.log('✅ Staff commands registered');
         } catch (error) {
-            console.error('❌ Error registering staff command:', error);
+            console.error('❌ Error registering staff commands:', error);
         }
     },
-    
+
     // Handle interactions
     handleInteraction: async (interaction, client) => {
         if (!interaction.isChatInputCommand()) return false;
-        
-        // Check if it's a staff command
+
+        // /say command
         if (interaction.commandName === 'say') {
             await handleSayCommand(interaction, client);
             return true;
         }
-        
+
+        // /SYBan command
+        if (interaction.commandName === 'syban') {
+            await handleSYBanCommand(interaction, client);
+            return true;
+        }
+
         return false;
     }
 };
 
 // /say command handler
 async function handleSayCommand(interaction, client) {
-    // Staff verification
     if (!STAFF_IDS.includes(interaction.user.id)) {
-        return interaction.reply({ 
-            content: '❌ This command is reserved for staff.', 
-            ephemeral: true 
+        return interaction.reply({
+            content: '❌ This command is reserved for staff.',
+            ephemeral: true
         });
     }
 
     await interaction.deferReply({ ephemeral: true });
-    
+
     const content = interaction.options.getString('content');
     const channel = interaction.options.getChannel('channel');
-    
+
     try {
-        // Validations
         if (!channel.isTextBased()) {
-            return interaction.editReply({ 
-                content: '❌ This channel does not support text messages.' 
+            return interaction.editReply({
+                content: '❌ This channel does not support text messages.'
             });
         }
-        
+
         const permissions = channel.permissionsFor(client.user);
         if (!permissions.has(PermissionFlagsBits.SendMessages)) {
-            return interaction.editReply({ 
-                content: '❌ I do not have permission to send messages in this channel.' 
+            return interaction.editReply({
+                content: '❌ I do not have permission to send messages in this channel.'
             });
         }
-        
-        // Send the message
+
         await channel.send(content);
-        
-        await interaction.editReply({ 
-            content: `✅ Message sent to ${channel}` 
-        });
-        
+        await interaction.editReply({ content: `✅ Message sent to ${channel}` });
+
     } catch (error) {
         console.error('[Say Command] Error:', error);
-        await interaction.editReply({ 
-            content: `❌ Error: ${error.message}` 
+        await interaction.editReply({ content: `❌ Error: ${error.message}` });
+    }
+}
+
+// ========================
+// /SYBan Handler
+// ========================
+async function handleSYBanCommand(interaction, client) {
+    const BAN_CHANNEL_ID = '1417568141428396063';
+
+    if (interaction.channelId !== BAN_CHANNEL_ID) {
+        return interaction.reply({
+            content: '❌ This command can only be used in the Ban channel.',
+            ephemeral: true
         });
     }
+
+    if (!STAFF_IDS.includes(interaction.user.id)) {
+        return interaction.reply({
+            content: '❌ This command is reserved for staff.',
+            ephemeral: true
+        });
+    }
+
+    const targetUser = interaction.options.getUser('user');
+    const reason = interaction.options.getString('reason');
+
+    const embed = new EmbedBuilder()
+        .setTitle('🔨 SYBan - Choose Ban Type')
+        .setDescription(`**User:** ${targetUser}\n**Reason:** \`${reason}\``)
+        .setColor(0xFF0000);
+
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(`syban_type:${targetUser.id}:${encodeURIComponent(reason)}`)
+                .setPlaceholder('Select ban type')
+                .addOptions([
+                    { label: 'PermBan', value: 'perm', emoji: '🔴' },
+                    { label: 'TempBan', value: 'temp', emoji: '🟠' }
+                ])
+        );
+
+    await interaction.reply({
+        embeds: [embed],
+        components: [row],
+        ephemeral: true
+    });
 }
