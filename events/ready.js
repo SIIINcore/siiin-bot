@@ -71,11 +71,9 @@ async function updateStatsEmbed(guild, client, freeGamesSet, promosSet, freeToPl
 async function sendDonationMessage(client) {
     try {
         const channel = await client.channels.fetch(DONATION_CHANNEL_ID).catch(() => null);
-        if (!channel) {
-            console.warn('❌ Donation channel not found!');
-            return;
-        }
+        if (!channel) return;
 
+        // Supprime les anciens messages du bot
         const messages = await channel.messages.fetch({ limit: 20 });
         for (const [, msg] of messages.filter(m => m.author.id === client.user.id)) {
             await msg.delete().catch(() => {});
@@ -128,38 +126,6 @@ async function sendSearchLinksMessage(client) {
     }
 }
 
-async function updateChatReminder(channel) {
-    try {
-        const messages = await channel.messages.fetch({ limit: 10 });
-        const botMessages = messages.filter(m => m.author.id === channel.client.user.id);
-
-        if (botMessages.size > 0) {
-            await botMessages.first().delete().catch(() => {});
-        }
-
-        const embed = new EmbedBuilder()
-            .setTitle('# Welcome to SIIIN P&+ Discord')
-            .setDescription(
-`▪ You are in the dedicated chat channel, help is welcome here, but this is not the support channel.
-
-# Rules reminder:
-▪ No insults
-▪ No links [Except YouTube]
-▪ No spam
-▪ This discord is not made for support.
-▪ For any support request: create a ticket in <#1468090646442279206>
-
-Please respect the rules for the happiness of Discord users.`
-            )
-            .setColor(0x5865F2)
-            .setFooter({ text: 'SIIIN Community • Be respectful' });
-
-        await channel.send({ embeds: [embed] });
-    } catch (err) {
-        console.error('[ChatReminder] Error:', err.message);
-    }
-}
-
 async function updateInformationMessage(client) {
     try {
         const INFO_CHANNEL_ID = '1033506664810287134';
@@ -202,6 +168,38 @@ https://discord.gg/eFBDgY2bup
         }
     } catch (err) {
         console.error('[UpdateInformationMessage] Error:', err.message);
+    }
+}
+
+async function updateChatReminder(channel) {
+    try {
+        const messages = await channel.messages.fetch({ limit: 10 });
+        const botMessages = messages.filter(m => m.author.id === channel.client.user.id);
+
+        if (botMessages.size > 0) {
+            await botMessages.first().delete().catch(() => {});
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('# Welcome to SIIIN P&+ Discord')
+            .setDescription(
+`▪ You are in the dedicated chat channel, help is welcome here, but this is not the support channel.
+
+# Rules reminder:
+▪ No insults
+▪ No links [Except YouTube]
+▪ No spam
+▪ This discord is not made for support.
+▪ For any support request: create a ticket in <#1468090646442279206>
+
+Please respect the rules for the happiness of Discord users.`
+            )
+            .setColor(0x5865F2)
+            .setFooter({ text: 'SIIIN Community • Be respectful' });
+
+        await channel.send({ embeds: [embed] });
+    } catch (err) {
+        console.error('[ChatReminder] Error:', err.message);
     }
 }
 
