@@ -127,7 +127,7 @@ async function sendSearchLinksMessage(client) {
 async function updateInformationMessage(client) {
     try {
         const INFO_CHANNEL_ID = '1033506664810287134';
-        const EXISTING_MESSAGE_ID = '1469900307688325242';
+        const EXISTING_MESSAGE_ID = '1469900307688325242'; // ← Mets à jour cet ID si besoin
 
         const infoChannel = await client.channels.fetch(INFO_CHANNEL_ID).catch(() => null);
         if (!infoChannel) return;
@@ -159,10 +159,16 @@ https://discord.gg/eFBDgY2bup
             .setTimestamp();
 
         try {
+            // On essaie d'éditer le message existant
             const existingMessage = await infoChannel.messages.fetch(EXISTING_MESSAGE_ID);
             await existingMessage.edit({ embeds: [embed] });
-        } catch {
-            await infoChannel.send({ embeds: [embed] });
+            console.log('✅ Information message updated successfully');
+        } catch (fetchError) {
+            // Si le message n'existe plus ou qu'on n'arrive pas à le récupérer
+            console.warn('⚠️ Could not find existing Information message. Sending a new one...');
+            const newMessage = await infoChannel.send({ embeds: [embed] });
+            console.log(`ℹ️ New Information message sent. New ID: ${newMessage.id}`);
+            console.log('→ Please update EXISTING_MESSAGE_ID in ready.js with this new ID.');
         }
     } catch (err) {
         console.error('[UpdateInformationMessage] Error:', err.message);
