@@ -14,10 +14,27 @@ let fetch;
 const { delay, truncateText, generateGameHash } = require('../../utils/helpers');
 const API_CONFIG = require('../../config/apiConfig');
 
+// ==================== +18 DETECTION ====================
+function isAdultGame(details) {
+    if (!details) return false;
+
+    // Vérifie l'âge requis
+    if (details.required_age && details.required_age >= 18) {
+        return true;
+    }
+
+    // Vérifie les content descriptors (nudité, contenu sexuel, etc.)
+    const descriptors = details.content_descriptors?.ids || [];
+    const adultIds = [1, 2, 3, 4, 5]; // 1=Nudity, 2=Sexual Content, etc.
+
+    return descriptors.some(id => adultIds.includes(id));
+}
+
+// ==================== SAFE FETCH ====================
 async function safeFetchJson(url, timeout = 15000) {
     if (!fetch) {
-        console.error('❌ fetch not initialized');
-        return null;
+        await delay(800);
+        if (!fetch) return null;
     }
 
     try {
@@ -38,6 +55,7 @@ async function safeFetchJson(url, timeout = 15000) {
     }
 }
 
+// ==================== EPIC GAMES ====================
 async function fetchEpicFreeGames() {
     const data = await safeFetchJson(`${API_CONFIG.GAMER_POWER.BASE_URL}${API_CONFIG.GAMER_POWER.EPIC_GAMES}`, 10000);
     if (!Array.isArray(data)) return [];
@@ -65,6 +83,7 @@ async function fetchEpicFreeGames() {
         .filter(game => game.title && game.url);
 }
 
+// ==================== STEAM FREE GAMES ====================
 async function fetchSteamFreeGames() {
     const data = await safeFetchJson(`${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.FEATURED}`, 15000);
     if (!data) return [];
@@ -82,6 +101,22 @@ async function fetchSteamFreeGames() {
             const isPermanentFree = finalPrice === 0 && originalPrice === 0;
 
             if (!isFreeWeekend && !isPermanentFree) continue;
+
+            // Vérification +18 via l'API Steam
+            try {
+                const detailsData = await safeFetchJson(
+                    `${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.APP_DETAILS(game.id)}`,
+                    8000
+                );
+                const details = detailsData?.[game.id]?.data;
+
+                if (details && isAdultGame(details)) {
+                    console.log(`🔞 +18 game detected (excluded): ${game.name}`);
+                    continue;
+                }
+            } catch (e) {
+                // On ignore les erreurs de vérification +18
+            }
 
             freeGames.push({
                 id: `steam_free_${game.id}`,
@@ -102,6 +137,7 @@ async function fetchSteamFreeGames() {
     return freeGames.slice(0, 10);
 }
 
+// ==================== CHEAPSHARK FREE GAMES ====================
 async function fetchCheapSharkFreeGames(storeId, storeKey) {
     const data = await safeFetchJson(
         `${API_CONFIG.CHEAP_SHARK.BASE_URL}/deals?storeID=${storeId}&upperPrice=0&pageSize=20`,
@@ -144,6 +180,7 @@ async function fetchCheapSharkFreeGames(storeId, storeKey) {
         });
 }
 
+// ==================== FREE TO PLAY ====================
 async function fetchFreeToPlayGames() {
     console.log('🔄 Fetching Free-to-Play games...');
 
@@ -172,6 +209,12 @@ async function fetchFreeToPlayGames() {
 
             const details = detailsData?.[entry.appId]?.data;
             if (!details) continue;
+
+            // Filtre +18
+            if (isAdultGame(details)) {
+                console.log(`🔞 +18 Free-to-Play game excluded: ${details.name}`);
+                continue;
+            }
 
             const isGame = details.type === 'game';
             const isFree = details.is_free === true;
@@ -203,6 +246,7 @@ async function fetchFreeToPlayGames() {
     return freeToPlayGames;
 }
 
+// ==================== ALL FREE GAMES ====================
 async function fetchAllFreeGames() {
     console.log('🔄 Fetching free games...');
 
