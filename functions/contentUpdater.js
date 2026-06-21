@@ -16,7 +16,6 @@ const STATE_DIR = path.join(__dirname, '..', 'data');
 const STATE_FILE = path.join(STATE_DIR, 'posted-content.json');
 const MAX_SAVED_IDS = 2000;
 
-// Salon dédié aux jeux +18
 const ADULT_CHANNEL_ID = '1518289861847683264';
 
 function ensureStateFile() {
@@ -60,17 +59,43 @@ let postedPromos = state.postedPromos;
 let postedFreeToPlay = state.postedFreeToPlay;
 let postedMobile = state.postedMobile;
 
+// ==================== BRAND / LOGO (Version stable Wikimedia) ====================
 function getBrand(store) {
     const map = {
-        steam:          { name: 'Steam',          icon: 'https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/steamworks_logo.png' },
-        'cheapshark-steam': { name: 'Steam',      icon: 'https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/steamworks_logo.png' },
-        'cs-gog':       { name: 'GOG',            icon: 'https://www.gog.com/favicon.ico' },
-        'cs-ea':        { name: 'EA',             icon: 'https://www.ea.com/favicon.ico' },
-        'cs-ubisoft':   { name: 'Ubisoft',        icon: 'https://store.ubisoft.com/favicon.ico' },
-        epic:           { name: 'Epic Games',     icon: 'https://store.epicgames.com/favicon.ico' },
-        'cs-epic':      { name: 'Epic Games',     icon: 'https://store.epicgames.com/favicon.ico' }
+        steam: {
+            name: 'Steam',
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/512px-Steam_icon_logo.svg.png'
+        },
+        'cheapshark-steam': {
+            name: 'Steam',
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/512px-Steam_icon_logo.svg.png'
+        },
+        'cs-gog': {
+            name: 'GOG',
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/GOG.com_logo.svg/512px-GOG.com_logo.svg.png'
+        },
+        'cs-ea': {
+            name: 'EA',
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Electronic_Arts_logo.svg/512px-Electronic_Arts_logo.svg.png'
+        },
+        'cs-ubisoft': {
+            name: 'Ubisoft',
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Ubisoft_logo.svg/512px-Ubisoft_logo.svg.png'
+        },
+        epic: {
+            name: 'Epic Games',
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Epic_Games_logo.svg/512px-Epic_Games_logo.svg.png'
+        },
+        'cs-epic': {
+            name: 'Epic Games',
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Epic_Games_logo.svg/512px-Epic_Games_logo.svg.png'
+        }
     };
-    return map[store] || { name: store, icon: 'https://discord.com/assets/2c21aeda16de354ba5334551a883b481.png' };
+
+    return map[store] || {
+        name: store,
+        icon: 'https://discord.com/assets/2c21aeda16de354ba5334551a883b481.png'
+    };
 }
 
 // ==================== FREE GAMES ====================
@@ -84,7 +109,6 @@ async function postFreeGames(channel) {
         const brand = getBrand(g.store);
         const isAdult = g.isAdult === true;
 
-        // Redirection vers le salon +18 si nécessaire
         const targetChannel = isAdult 
             ? await channel.client.channels.fetch(ADULT_CHANNEL_ID).catch(() => channel)
             : channel;
