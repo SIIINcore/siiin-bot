@@ -9,6 +9,7 @@ const {
     SEARCH_CHANNEL_ID
 } = require('../config/constants');
 const staffCommands = require('../staffCommands');
+const { startGameTracker } = require('../functions/gameTracker');
 
 let lastVersionLogged = null;
 
@@ -127,7 +128,7 @@ async function sendSearchLinksMessage(client) {
 async function updateInformationMessage(client) {
     try {
         const INFO_CHANNEL_ID = '1033506664810287134';
-        const EXISTING_MESSAGE_ID = '1469900307688325242'; // ← Mets à jour cet ID si besoin
+        const EXISTING_MESSAGE_ID = '1469900307688325242';
 
         const infoChannel = await client.channels.fetch(INFO_CHANNEL_ID).catch(() => null);
         if (!infoChannel) return;
@@ -159,12 +160,10 @@ https://discord.gg/eFBDgY2bup
             .setTimestamp();
 
         try {
-            // On essaie d'éditer le message existant
             const existingMessage = await infoChannel.messages.fetch(EXISTING_MESSAGE_ID);
             await existingMessage.edit({ embeds: [embed] });
             console.log('✅ Information message updated successfully');
         } catch (fetchError) {
-            // Si le message n'existe plus ou qu'on n'arrive pas à le récupérer
             console.warn('⚠️ Could not find existing Information message. Sending a new one...');
             const newMessage = await infoChannel.send({ embeds: [embed] });
             console.log(`ℹ️ New Information message sent. New ID: ${newMessage.id}`);
@@ -189,6 +188,9 @@ module.exports = {
             await sendDonationMessage(client);
             await sendSearchLinksMessage(client);
 
+            // === GAME TRACKER ===
+            startGameTracker(client);
+
             if (lastVersionLogged !== BOT_VERSION) {
                 const logChannel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
                 if (logChannel) {
@@ -201,7 +203,7 @@ module.exports = {
                             { name: '📅 Date', value: new Date().toLocaleDateString('en-US'), inline: true },
                             { name: '⏰ Time', value: new Date().toLocaleTimeString('en-US'), inline: true },
                             { name: '🛡️ Security', value: 'Automod Active', inline: false },
-                            { name: '🎮 APIs', value: 'Steam + Epic + GOG + CheapShark + Mobile', inline: false }
+                            { name: '🎮 APIs', value: 'Steam + Epic + GOG + CheapShark + Mobile + GameTracker', inline: false }
                         )
                         .setTimestamp();
                     await logChannel.send({ embeds: [embed] });
