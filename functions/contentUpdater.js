@@ -59,36 +59,36 @@ let postedPromos = state.postedPromos;
 let postedFreeToPlay = state.postedFreeToPlay;
 let postedMobile = state.postedMobile;
 
-// ==================== BRAND / LOGO (Version stable Wikimedia) ====================
+// ==================== BRAND / LOGO (Liens directs SVG - sans conversion) ====================
 function getBrand(store) {
     const map = {
         steam: {
             name: 'Steam',
-            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/512px-Steam_icon_logo.svg.png'
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg'
         },
         'cheapshark-steam': {
             name: 'Steam',
-            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/512px-Steam_icon_logo.svg.png'
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg'
         },
         'cs-gog': {
             name: 'GOG',
-            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/GOG.com_logo.svg/512px-GOG.com_logo.svg.png'
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/4/4c/GOG.com_logo.svg'
         },
         'cs-ea': {
             name: 'EA',
-            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Electronic_Arts_logo.svg/512px-Electronic_Arts_logo.svg.png'
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/0/0d/Electronic_Arts_logo.svg'
         },
         'cs-ubisoft': {
             name: 'Ubisoft',
-            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Ubisoft_logo.svg/512px-Ubisoft_logo.svg.png'
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Ubisoft_logo.svg'
         },
         epic: {
             name: 'Epic Games',
-            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Epic_Games_logo.svg/512px-Epic_Games_logo.svg.png'
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/3/31/Epic_Games_logo.svg'
         },
         'cs-epic': {
             name: 'Epic Games',
-            icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Epic_Games_logo.svg/512px-Epic_Games_logo.svg.png'
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/3/31/Epic_Games_logo.svg'
         }
     };
 
