@@ -1,7 +1,8 @@
 const { EmbedBuilder } = require('discord.js');
 const { 
     CHANNEL_WELCOME, 
-    MEMBER_ROLE_ID 
+    MEMBER_ROLE_ID,
+    LOG_CHANNEL_ID 
 } = require('../config/constants');
 const { handleAntiRaid } = require('../functions/antiRaid');
 const { updateStatsEmbed, postedGames, postedPromos, postedFreeToPlay, postedMobile } = require('../functions/contentUpdater');
@@ -9,22 +10,35 @@ const { updateStatsEmbed, postedGames, postedPromos, postedFreeToPlay, postedMob
 module.exports = {
     name: 'guildMemberAdd',
     async execute(member, client) {
+        const logChannel = await member.guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+
         try {
+            // === LOG : Nouveau membre ===
+            if (logChannel) {
+                await logChannel.send(`📥 **Nouveau membre** → ${member.user.tag} (<@${member.id}>)`);
+            }
+
             // === ANTI-RAID ===
             await handleAntiRaid(member, client);
 
-            // === Ajout du rôle membre ===
+            // === Ajout du rôle Player ===
             const roleId = MEMBER_ROLE_ID;
             try {
                 const role = await member.guild.roles.fetch(roleId);
-                if (role && !member.roles.cache.has(roleId)) {
+                if (!role) {
+                    if (logChannel) await logChannel.send(`❌ Rôle Player introuvable (ID: ${roleId})`);
+                } else if (member.roles.cache.has(roleId)) {
+                    if (logChannel) await logChannel.send(`ℹ️ ${member.user.tag} avait déjà le rôle Player`);
+                } else {
                     await member.roles.add(role);
+                    if (logChannel) await logChannel.send(`✅ Rôle **Player** donné à ${member.user.tag}`);
                 }
             } catch (err) {
-                console.error(`❌ Could not add role to ${member.user.tag}:`, err.message);
+                console.error(`❌ Erreur ajout rôle Player à ${member.user.tag}:`, err.message);
+                if (logChannel) await logChannel.send(`❌ Erreur lors de l'ajout du rôle Player à ${member.user.tag}`);
             }
 
-            // === Message de bienvenue complet ===
+            // === Message de bienvenue ===
             const welcomeChannel = await client.channels.fetch(CHANNEL_WELCOME).catch(() => null);
             if (welcomeChannel) {
                 const welcomeText = `
@@ -54,7 +68,11 @@ Enjoy your stay and check out the links below!
 To support us, please feel free to donate a bit. Just Here : <#1178517213444046948>
 [Donations Direct link](https://www.paypal.com/paypalme/LunaSiiin?)
 `;
+
                 await welcomeChannel.send({ content: welcomeText });
+                if (logChannel) await logChannel.send(`✅ Message de bienvenue envoyé à ${member.user.tag}`);
+            } else {
+                if (logChannel) await logChannel.send(`❌ Salon de bienvenue introuvable (ID: ${CHANNEL_WELCOME})`);
             }
 
             // === Mise à jour des stats ===
@@ -67,7 +85,10 @@ To support us, please feel free to donate a bit. Just Here : <#11785172134440469
             }, 5000);
 
         } catch (err) {
-            console.error('[guildMemberAdd] Error:', err.message);
+            console.error('[guildMemberAdd] Erreur globale:', err.message);
+            if (logChannel) {
+                await logChannel.send(`❌ Erreur dans guildMemberAdd pour ${member.user.tag} : ${err.message}`);
+            }
         }
     }
 };
