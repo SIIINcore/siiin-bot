@@ -46,6 +46,50 @@ async function safeFetchJson(url, timeout = 15000) {
     }
 }
 
+// ==================== GAMERPOWER ====================
+async function fetchGamerPowerFreeGames() {
+    console.log('🔄 Fetching free games from GamerPower...');
+
+    const data = await safeFetchJson(`${API_CONFIG.GAMER_POWER.BASE_URL}${API_CONFIG.GAMER_POWER.FREE_GAMES}`, 15000);
+    if (!Array.isArray(data)) return [];
+
+    const games = [];
+
+    for (const game of data) {
+        // On ne garde que les jeux PC
+        if (!game.platforms || !game.platforms.toLowerCase().includes('pc')) continue;
+
+        // On essaie de détecter les jeux +18 via le titre/description (GamerPower ne donne pas required_age)
+        const isAdult = /adult|18\+|mature|nudity|sexual/i.test(
+            `${game.title} ${game.description || ''}`
+        );
+
+        if (isAdult) {
+            console.log(`🔞 +18 game detected from GamerPower: ${game.title}`);
+        }
+
+        games.push({
+            id: `gamerpower_${game.id}`,
+            title: game.title,
+            url: game.open_giveaway_url || game.gamerpower_url,
+            image: game.image,
+            description: truncateText(game.description || 'Free game via GamerPower', 500),
+            platform: game.platforms,
+            type: 'free',
+            store: game.platforms.toLowerCase().includes('epic') ? 'epic' : 'other',
+            sourceLabel: 'GamerPower',
+            worth: game.worth && game.worth !== 'N/A' ? game.worth : '',
+            endDate: game.end_date && game.end_date !== 'N/A'
+                ? `Until: ${new Date(game.end_date).toLocaleDateString('en-US')}`
+                : '',
+            isAdult: isAdult
+        });
+    }
+
+    console.log(`✅ ${games.length} games from GamerPower`);
+    return games;
+}
+
 // ==================== EPIC GAMES ====================
 async function fetchEpicFreeGames() {
     const data = await safeFetchJson(`${API_CONFIG.GAMER_POWER.BASE_URL}${API_CONFIG.GAMER_POWER.EPIC_GAMES}`, 10000);
@@ -75,7 +119,7 @@ async function fetchEpicFreeGames() {
         .filter(game => game.title && game.url);
 }
 
-// ==================== STEAM FREE GAMES (avec vrais prix €) ====================
+// ==================== STEAM FREE GAMES ====================
 async function fetchSteamFreeGames() {
     const data = await safeFetchJson(`${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.FEATURED}`, 15000);
     if (!data) return [];
@@ -99,7 +143,6 @@ async function fetchSteamFreeGames() {
             let originalPriceEUR = 'N/A';
 
             try {
-                // Vérification +18
                 const detailsData = await safeFetchJson(
                     `${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.APP_DETAILS(game.id)}`,
                     8000
@@ -112,15 +155,12 @@ async function fetchSteamFreeGames() {
                         continue;
                     }
 
-                    // Récupération du vrai prix d'origine en EUR
-                    if (originalPrice > 0 && details.price_overview) {
-                        // On refait un appel avec cc=eur pour avoir le vrai prix en euro
+                    if (originalPrice > 0) {
                         const eurData = await safeFetchJson(
                             `${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.APP_DETAILS(game.id)}&cc=eur`,
                             8000
                         );
                         const eurPrice = eurData?.[game.id]?.data?.price_overview;
-
                         if (eurPrice) {
                             originalPriceEUR = (eurPrice.initial / 100).toFixed(2);
                         }
@@ -149,7 +189,7 @@ async function fetchSteamFreeGames() {
     return freeGames.slice(0, 10);
 }
 
-// ==================== CHEAPSHARK FREE GAMES ====================
+// ==================== CHEAPSHARK ====================
 async function fetchCheapSharkFreeGames(storeId, storeKey) {
     const data = await safeFetchJson(
         `${API_CONFIG.CHEAP_SHARK.BASE_URL}/deals?storeID=${storeId}&upperPrice=0&pageSize=20`,
@@ -278,7 +318,8 @@ async function fetchAllFreeGames() {
             fetchSteamFreeGames(),
             fetchCheapSharkFreeGames(API_CONFIG.CHEAP_SHARK.STORES.GOG, 'cs-gog'),
             fetchCheapSharkFreeGames(API_CONFIG.CHEAP_SHARK.STORES.EA, 'cs-ea'),
-            fetchCheapSharkFreeGames(API_CONFIG.CHEAP_SHARK.STORES.UBISOFT, 'cs-ubisoft')
+            fetchCheapSharkFreeGames(API_CONFIG.CHEAP_SHARK.STORES.UBISOFT, 'cs-ubisoft'),
+            fetchGamerPowerFreeGames()   // ← Ajout de GamerPower
         ]);
 
         for (const games of batches) {
@@ -302,5 +343,6 @@ module.exports = {
     fetchSteamFreeGames,
     fetchCheapSharkFreeGames,
     fetchFreeToPlayGames,
-    fetchAllFreeGames
+    fetchAllFreeGames,
+    fetchGamerPowerFreeGames
 };
