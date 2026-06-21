@@ -15,13 +15,21 @@ const { delay } = require('../utils/helpers');
 const STATE_DIR = path.join(__dirname, '..', 'data');
 const STATE_FILE = path.join(STATE_DIR, 'posted-content.json');
 const MAX_SAVED_IDS = 2000;
+const CLEANUP_INTERVAL_DAYS = 15;
 
 const ADULT_CHANNEL_ID = '1518289861847683264';
 
 function ensureStateFile() {
     if (!fs.existsSync(STATE_DIR)) fs.mkdirSync(STATE_DIR, { recursive: true });
     if (!fs.existsSync(STATE_FILE)) {
-        fs.writeFileSync(STATE_FILE, JSON.stringify({ postedGames: [], postedPromos: [], postedFreeToPlay: [], postedMobile: [] }, null, 2));
+        const initialData = {
+            postedGames: [],
+            postedPromos: [],
+            postedFreeToPlay: [],
+            postedMobile: [],
+            lastCleanup: Date.now()
+        };
+        fs.writeFileSync(STATE_FILE, JSON.stringify(initialData, null, 2));
     }
 }
 
@@ -30,25 +38,34 @@ function loadState() {
         ensureStateFile();
         const raw = fs.readFileSync(STATE_FILE, 'utf8');
         const parsed = JSON.parse(raw);
+
         return {
             postedGames: new Set(parsed.postedGames || []),
             postedPromos: new Set(parsed.postedPromos || []),
             postedFreeToPlay: new Set(parsed.postedFreeToPlay || []),
-            postedMobile: new Set(parsed.postedMobile || [])
+            postedMobile: new Set(parsed.postedMobile || []),
+            lastCleanup: parsed.lastCleanup || Date.now()
         };
     } catch {
-        return { postedGames: new Set(), postedPromos: new Set(), postedFreeToPlay: new Set(), postedMobile: new Set() };
+        return {
+            postedGames: new Set(),
+            postedPromos: new Set(),
+            postedFreeToPlay: new Set(),
+            postedMobile: new Set(),
+            lastCleanup: Date.now()
+        };
     }
 }
 
-function saveState(games, promos, f2p, mobile) {
+function saveState(games, promos, f2p, mobile, lastCleanup) {
     try {
         ensureStateFile();
         fs.writeFileSync(STATE_FILE, JSON.stringify({
             postedGames: Array.from(games).slice(-MAX_SAVED_IDS),
             postedPromos: Array.from(promos).slice(-MAX_SAVED_IDS),
             postedFreeToPlay: Array.from(f2p).slice(-MAX_SAVED_IDS),
-            postedMobile: Array.from(mobile).slice(-MAX_SAVED_IDS)
+            postedMobile: Array.from(mobile).slice(-MAX_SAVED_IDS),
+            lastCleanup: lastCleanup || Date.now()
         }, null, 2));
     } catch (e) {}
 }
@@ -58,8 +75,37 @@ let postedGames = state.postedGames;
 let postedPromos = state.postedPromos;
 let postedFreeToPlay = state.postedFreeToPlay;
 let postedMobile = state.postedMobile;
+let lastCleanup = state.lastCleanup;
 
-// ==================== BRAND / LOGO (Liens directs SVG - sans conversion) ====================
+// ==================== NETTOYAGE AUTOMATIQUE ====================
+function shouldCleanup() {
+    const daysSinceLastCleanup = (Date.now() - lastCleanup) / (1000 * 60 * 60 * 24);
+    return daysSinceLastCleanup >= CLEANUP_INTERVAL_DAYS;
+}
+
+function performCleanup() {
+    console.log('🧹 Nettoyage automatique des données (tous les 15 jours)');
+    postedGames.clear();
+    postedPromos.clear();
+    postedFreeToPlay.clear();
+    postedMobile.clear();
+    lastCleanup = Date.now();
+    saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile, lastCleanup);
+}
+
+// Vérifie au démarrage si un nettoyage est nécessaire
+if (shouldCleanup()) {
+    performCleanup();
+}
+
+// Vérifie toutes les 24h
+setInterval(() => {
+    if (shouldCleanup()) {
+        performCleanup();
+    }
+}, 24 * 60 * 60 * 1000);
+
+// ==================== GET BRAND ====================
 function getBrand(store) {
     const map = {
         steam: {
@@ -137,7 +183,7 @@ async function postFreeGames(channel) {
         await targetChannel.send({ embeds: [embed] });
         postedGames.add(g.id);
         count++;
-        saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
+        saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile, lastCleanup);
         await delay(650);
     }
 
@@ -177,7 +223,7 @@ async function postPromos(channel) {
         await targetChannel.send({ embeds: [embed] });
         postedPromos.add(p.id);
         count++;
-        saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
+        saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile, lastCleanup);
         await delay(650);
     }
 
@@ -210,7 +256,7 @@ async function postFreeToPlayGames(channel) {
         await channel.send({ embeds: [embed] });
         postedFreeToPlay.add(g.id);
         count++;
-        saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
+        saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile, lastCleanup);
         await delay(650);
     }
 
@@ -246,7 +292,7 @@ async function postMobileApps(channel) {
         await channel.send({ embeds: [embed] });
         postedMobile.add(app.id);
         count++;
-        saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
+        saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile, lastCleanup);
         await delay(650);
     }
 
