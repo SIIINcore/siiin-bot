@@ -16,6 +16,9 @@ const STATE_DIR = path.join(__dirname, '..', 'data');
 const STATE_FILE = path.join(STATE_DIR, 'posted-content.json');
 const MAX_SAVED_IDS = 2000;
 
+// Salon pour les jeux +18
+const ADULT_CHANNEL_ID = '1518289861847683264';
+
 function ensureStateFile() {
     if (!fs.existsSync(STATE_DIR)) fs.mkdirSync(STATE_DIR, { recursive: true });
     if (!fs.existsSync(STATE_FILE)) {
@@ -57,7 +60,6 @@ let postedPromos = state.postedPromos;
 let postedFreeToPlay = state.postedFreeToPlay;
 let postedMobile = state.postedMobile;
 
-// ==================== BRAND / LOGO ====================
 function getBrand(store) {
     const map = {
         steam:          { name: 'Steam',          icon: 'https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/steamworks_logo.png' },
@@ -80,15 +82,21 @@ async function postFreeGames(channel) {
         if (postedGames.has(g.id)) continue;
 
         const brand = getBrand(g.store);
+        const isAdult = g.isAdult || false; // On peut améliorer ça plus tard
+
+        const targetChannel = isAdult 
+            ? await channel.client.channels.fetch(ADULT_CHANNEL_ID).catch(() => channel)
+            : channel;
+
         const showOriginal = g.originalPriceUSD && parseFloat(g.originalPriceUSD) > 0;
 
         const embed = new EmbedBuilder()
             .setTitle(`🎮 ${g.title}`)
             .setURL(g.url)
-            .setColor(0x00AAFF)
+            .setColor(isAdult ? 0xFF00FF : 0x00AAFF)
             .setAuthor({ name: brand.name, iconURL: brand.icon })
             .setThumbnail(brand.icon)
-            .addFields({ name: 'Status', value: '**FREE**', inline: true });
+            .addFields({ name: 'Status', value: isAdult ? '**+18 FREE**' : '**FREE**', inline: true });
 
         if (showOriginal) {
             embed.addFields({ name: 'Was', value: `$${g.originalPriceUSD} / €${g.originalPriceEUR}`, inline: true });
@@ -99,9 +107,9 @@ async function postFreeGames(channel) {
         }
 
         if (g.image) embed.setImage(g.image);
-        embed.setFooter({ text: brand.name });
+        embed.setFooter({ text: brand.name + (isAdult ? ' • +18' : '') });
 
-        await channel.send({ embeds: [embed] });
+        await targetChannel.send({ embeds: [embed] });
         postedGames.add(g.id);
         count++;
         saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
@@ -120,11 +128,16 @@ async function postPromos(channel) {
         if (postedPromos.has(p.id)) continue;
 
         const brand = getBrand(p.store);
+        const isAdult = p.isAdult || false;
+
+        const targetChannel = isAdult 
+            ? await channel.client.channels.fetch(ADULT_CHANNEL_ID).catch(() => channel)
+            : channel;
 
         const embed = new EmbedBuilder()
             .setTitle(`🏷️ ${p.title}`)
             .setURL(p.url)
-            .setColor(p.discountPercent >= 70 ? 0xFF0000 : 0xFF9900)
+            .setColor(isAdult ? 0xFF00FF : (p.discountPercent >= 70 ? 0xFF0000 : 0xFF9900))
             .setAuthor({ name: brand.name, iconURL: brand.icon })
             .setThumbnail(brand.icon)
             .addFields(
@@ -132,11 +145,11 @@ async function postPromos(channel) {
                 { name: 'Sale Price',     value: `$${p.priceUSD} / €${p.priceEUR}`, inline: true },
                 { name: 'Discount',       value: `**${p.discountPercent}% OFF**`, inline: true }
             )
-            .setFooter({ text: brand.name });
+            .setFooter({ text: brand.name + (isAdult ? ' • +18' : '') });
 
         if (p.image) embed.setImage(p.image);
 
-        await channel.send({ embeds: [embed] });
+        await targetChannel.send({ embeds: [embed] });
         postedPromos.add(p.id);
         count++;
         saveState(postedGames, postedPromos, postedFreeToPlay, postedMobile);
