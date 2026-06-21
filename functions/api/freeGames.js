@@ -50,22 +50,23 @@ async function safeFetchJson(url, timeout = 15000) {
 async function fetchGamerPowerFreeGames() {
     console.log('🔄 Fetching free games from GamerPower...');
 
-    const data = await safeFetchJson(`${API_CONFIG.GAMER_POWER.BASE_URL}${API_CONFIG.GAMER_POWER.FREE_GAMES}`, 15000);
+    const url = `${API_CONFIG.GAMER_POWER.BASE_URL}${API_CONFIG.GAMER_POWER.FREE_GAMES}`;
+    const data = await safeFetchJson(url, 15000);
+
     if (!Array.isArray(data)) return [];
 
     const games = [];
 
     for (const game of data) {
-        // On ne garde que les jeux PC
         if (!game.platforms || !game.platforms.toLowerCase().includes('pc')) continue;
 
-        // On essaie de détecter les jeux +18 via le titre/description (GamerPower ne donne pas required_age)
         const isAdult = /adult|18\+|mature|nudity|sexual/i.test(
             `${game.title} ${game.description || ''}`
         );
 
         if (isAdult) {
-            console.log(`🔞 +18 game detected from GamerPower: ${game.title}`);
+            console.log(`🔞 +18 game from GamerPower excluded: ${game.title}`);
+            continue;
         }
 
         games.push({
@@ -92,7 +93,8 @@ async function fetchGamerPowerFreeGames() {
 
 // ==================== EPIC GAMES ====================
 async function fetchEpicFreeGames() {
-    const data = await safeFetchJson(`${API_CONFIG.GAMER_POWER.BASE_URL}${API_CONFIG.GAMER_POWER.EPIC_GAMES}`, 10000);
+    const url = `${API_CONFIG.GAMER_POWER.BASE_URL}${API_CONFIG.GAMER_POWER.EPIC_GAMES}`;
+    const data = await safeFetchJson(url, 10000);
     if (!Array.isArray(data)) return [];
 
     return data
@@ -319,7 +321,7 @@ async function fetchAllFreeGames() {
             fetchCheapSharkFreeGames(API_CONFIG.CHEAP_SHARK.STORES.GOG, 'cs-gog'),
             fetchCheapSharkFreeGames(API_CONFIG.CHEAP_SHARK.STORES.EA, 'cs-ea'),
             fetchCheapSharkFreeGames(API_CONFIG.CHEAP_SHARK.STORES.UBISOFT, 'cs-ubisoft'),
-            fetchGamerPowerFreeGames()   // ← Ajout de GamerPower
+            fetchGamerPowerFreeGames()
         ]);
 
         for (const games of batches) {
