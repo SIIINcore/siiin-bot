@@ -16,7 +16,7 @@ const STATE_DIR = path.join(__dirname, '..', 'data');
 const STATE_FILE = path.join(STATE_DIR, 'posted-content.json');
 const MAX_SAVED_IDS = 2000;
 
-// Salon pour les jeux +18
+// Salon dédié aux jeux +18
 const ADULT_CHANNEL_ID = '1518289861847683264';
 
 function ensureStateFile() {
@@ -82,8 +82,9 @@ async function postFreeGames(channel) {
         if (postedGames.has(g.id)) continue;
 
         const brand = getBrand(g.store);
-        const isAdult = g.isAdult || false; // On peut améliorer ça plus tard
+        const isAdult = g.isAdult === true;
 
+        // Redirection vers le salon +18 si nécessaire
         const targetChannel = isAdult 
             ? await channel.client.channels.fetch(ADULT_CHANNEL_ID).catch(() => channel)
             : channel;
@@ -128,7 +129,7 @@ async function postPromos(channel) {
         if (postedPromos.has(p.id)) continue;
 
         const brand = getBrand(p.store);
-        const isAdult = p.isAdult || false;
+        const isAdult = p.isAdult === true;
 
         const targetChannel = isAdult 
             ? await channel.client.channels.fetch(ADULT_CHANNEL_ID).catch(() => channel)
