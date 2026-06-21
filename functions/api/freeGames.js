@@ -14,21 +14,14 @@ let fetch;
 const { delay, truncateText, generateGameHash } = require('../../utils/helpers');
 const API_CONFIG = require('../../config/apiConfig');
 
-// ==================== +18 DETECTION ====================
 function isAdultGame(details) {
     if (!details) return false;
-
-    if (details.required_age && details.required_age >= 18) {
-        return true;
-    }
-
+    if (details.required_age && details.required_age >= 18) return true;
     const descriptors = details.content_descriptors?.ids || [];
     const adultIds = [1, 2, 3, 4, 5];
-
     return descriptors.some(id => adultIds.includes(id));
 }
 
-// ==================== SAFE FETCH ====================
 async function safeFetchJson(url, timeout = 15000) {
     if (!fetch) {
         await delay(800);
@@ -77,12 +70,12 @@ async function fetchEpicFreeGames() {
             endDate: game.end_date && game.end_date !== 'N/A'
                 ? `Until: ${new Date(game.end_date).toLocaleDateString('en-US')}`
                 : '',
-            isAdult: false // Epic ne renvoie pas facilement cette info
+            isAdult: false
         }))
         .filter(game => game.title && game.url);
 }
 
-// ==================== STEAM FREE GAMES ====================
+// ==================== STEAM FREE GAMES (avec vrais prix €) ====================
 async function fetchSteamFreeGames() {
     const data = await safeFetchJson(`${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.FEATURED}`, 15000);
     if (!data) return [];
@@ -102,17 +95,36 @@ async function fetchSteamFreeGames() {
             if (!isFreeWeekend && !isPermanentFree) continue;
 
             let isAdult = false;
+            let originalPriceUSD = originalPrice > 0 ? (originalPrice / 100).toFixed(2) : '0.00';
+            let originalPriceEUR = 'N/A';
 
             try {
+                // Vérification +18
                 const detailsData = await safeFetchJson(
                     `${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.APP_DETAILS(game.id)}`,
                     8000
                 );
                 const details = detailsData?.[game.id]?.data;
 
-                if (details && isAdultGame(details)) {
-                    console.log(`🔞 +18 game detected: ${game.name}`);
-                    isAdult = true;
+                if (details) {
+                    if (isAdultGame(details)) {
+                        console.log(`🔞 +18 game excluded: ${game.name}`);
+                        continue;
+                    }
+
+                    // Récupération du vrai prix d'origine en EUR
+                    if (originalPrice > 0 && details.price_overview) {
+                        // On refait un appel avec cc=eur pour avoir le vrai prix en euro
+                        const eurData = await safeFetchJson(
+                            `${API_CONFIG.STEAM.BASE_URL}${API_CONFIG.STEAM.APP_DETAILS(game.id)}&cc=eur`,
+                            8000
+                        );
+                        const eurPrice = eurData?.[game.id]?.data?.price_overview;
+
+                        if (eurPrice) {
+                            originalPriceEUR = (eurPrice.initial / 100).toFixed(2);
+                        }
+                    }
                 }
             } catch (e) {}
 
@@ -126,9 +138,10 @@ async function fetchSteamFreeGames() {
                 type: isFreeWeekend ? 'free_weekend' : 'free',
                 store: 'steam',
                 sourceLabel: 'Steam',
-                originalPrice: originalPrice > 0 ? `$${(originalPrice / 100).toFixed(2)}` : 'Free-to-Play',
+                originalPriceUSD: originalPriceUSD,
+                originalPriceEUR: originalPriceEUR,
                 discountPercent: isFreeWeekend ? 100 : 0,
-                isAdult: isAdult
+                isAdult: false
             });
         }
     }
@@ -173,9 +186,9 @@ async function fetchCheapSharkFreeGames(storeId, storeKey) {
                     'cs-steam': 'CS Steam',
                     'cs-epic': 'CS EpicGames'
                 }[storeKey] || 'CheapShark',
-                originalPrice: `$${parseFloat(game.normalPrice || '0').toFixed(2)}`,
-                worth: game.savings ? `Value: $${parseFloat(game.savings).toFixed(2)} saved` : '',
-                isAdult: false // CheapShark ne donne pas cette info facilement
+                originalPriceUSD: parseFloat(game.normalPrice || '0').toFixed(2),
+                originalPriceEUR: 'N/A',
+                isAdult: false
             };
         });
 }
@@ -211,7 +224,7 @@ async function fetchFreeToPlayGames() {
             if (!details) continue;
 
             if (isAdultGame(details)) {
-                console.log(`🔞 +18 Free-to-Play game excluded from normal list: ${details.name}`);
+                console.log(`🔞 +18 Free-to-Play game excluded: ${details.name}`);
                 continue;
             }
 
